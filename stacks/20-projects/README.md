@@ -22,7 +22,7 @@ Keys align with the existing GCP LZs' `existing_project_ids` map so consumers do
 | `piam` | `gcp0-prj-emp-piam-01` | Identity foundation (WIF pool created by `gcp-identity-baseline`) | `Platform` |
 | `pdns` | `gcp0-prj-emp-pdns-01` | Cloud DNS host (zones created by `gcp-dns-baseline`) | `Platform` |
 | `pingress` | `gcp0-prj-emp-pingress-01` | Shared ingress baseline | `Platform` |
-| `sandbox` | `gcp0-prj-emp-psandbox-01` | Single-instance sandbox (ID uses canonical `p` prefix; key stays `sandbox` for LZ compat) | `Sandbox` |
+| `sandbox` | `gcp0-prj-emp-sandbox-01` | Single-instance sandbox (ID uses canonical `p` prefix; key stays `sandbox` for LZ compat) | `Sandbox` |
 
 ## What it owns
 

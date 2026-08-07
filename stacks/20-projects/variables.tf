@@ -73,7 +73,7 @@ variable "create_reference_platform_projects" {
 #   gcp0-prj-emp-piam-01
 #   gcp0-prj-emp-pdns-01
 #   gcp0-prj-emp-pingress-01
-#   gcp0-prj-emp-psandbox-01
+#   gcp0-prj-emp-sandbox-01
 # -----------------------------------------------------------------------------
 
 variable "org_prefix" {
@@ -137,7 +137,7 @@ variable "enable_pingress" {
 }
 
 variable "enable_sandbox" {
-  description = "Provision the sandbox project (single-instance, ID uses 'psandbox' segment)."
+  description = "Provision the sandbox project (single-instance, ID uses 'sandbox' segment)."
   type        = bool
   default     = true
 }

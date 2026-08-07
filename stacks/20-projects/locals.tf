@@ -38,7 +38,7 @@ locals {
   # Canonical project ID composition — mirrors the GCP LZ single-instance
   # pattern:
   #   ${org_prefix}-prj-${company}[-${division}]-<role_id_segment>-${control}
-  # role_id_segment is the 'p'-prefixed form (piam, plogs, ..., psandbox).
+  # role_id_segment is the 'p'-prefixed form (piam, plogs, ..., sandbox).
   # -----------------------------------------------------------------------------
   id_segment_by_role = {
     plogs    = "plogs"
@@ -46,7 +46,7 @@ locals {
     piam     = "piam"
     pdns     = "pdns"
     pingress = "pingress"
-    sandbox  = "psandbox"
+    sandbox  = "sandbox"
   }
 
   reference_project_ids = {

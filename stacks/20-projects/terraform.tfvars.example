@@ -74,5 +74,5 @@ enable_platform_projects = true
 #   piam     = "gcp0-prj-emp-piam-01"
 #   pdns     = "gcp0-prj-emp-pdns-01"
 #   pingress = "gcp0-prj-emp-pingress-01"
-#   sandbox  = "gcp0-prj-emp-psandbox-01"
+#   sandbox  = "gcp0-prj-emp-sandbox-01"
 # }

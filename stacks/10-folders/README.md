@@ -24,7 +24,7 @@ Organization
 ├── LandingZones        # parent of every Tier 2 LZ's projects
 │   ├── Production      # opt-in via reference_landing_zone_children
 │   └── NonProduction   # opt-in via reference_landing_zone_children
-└── Sandbox             # for psandbox (stack 20)
+└── Sandbox             # for sandbox (stack 20)
 ```
 
 Rationale for the split: `Platform` isolates the org's shared services from tenant workloads; `LandingZones` is where each LZ's projects (and its own sub-tree) land; `Sandbox` is the ephemeral experimentation zone with looser policies. Aligned with Google Cloud Foundation Fabric.

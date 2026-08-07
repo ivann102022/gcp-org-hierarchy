@@ -1,0 +1,41 @@
+###############################################################################
+# File:        stacks/00-org-baseline/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the org-baseline stack. Copy to
+#              terraform.tfvars (git-ignored) and fill in the REQUIRED
+#              organisation-specific values.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — locate the Organization + billing account.
+# -----------------------------------------------------------------------------
+
+organization_domain = "example.com"
+billing_account_id  = "01ABCD-234567-EFGH89"
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — mode. Only 'existing' and 'create' are valid in v0.1.0.
+# Default: 'existing'. See ADR-0001 for why there is no 'blueprint' mode.
+# -----------------------------------------------------------------------------
+
+# organization_mode = "existing"
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — essential contacts at the Organization scope.
+# Requires roles/essentialcontacts.admin at the Org level.
+#
+# Categories:
+#   ALL / SUSPENSION / SECURITY / TECHNICAL / BILLING / LEGAL
+#   PRODUCT_UPDATES / TECHNICAL_INCIDENTS
+# -----------------------------------------------------------------------------
+
+# enable_essential_contacts = true
+
+# essential_contacts = {
+#   "security-team@example.com" = ["SECURITY", "TECHNICAL_INCIDENTS"]
+#   "billing@example.com"       = ["BILLING"]
+#   "platform-oncall@example.com" = ["ALL"]
+# }
+
+# essential_contact_language = "en"

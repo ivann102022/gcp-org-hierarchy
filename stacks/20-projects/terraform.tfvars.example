@@ -1,0 +1,78 @@
+###############################################################################
+# File:        stacks/20-projects/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the platform-projects stack.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — remote-state pointers.
+# -----------------------------------------------------------------------------
+
+org_baseline_state_bucket = "REPLACE-ME-tfstate-bucket"
+folders_state_bucket      = "REPLACE-ME-tfstate-bucket"
+
+# Only override these if you changed the default prefix in the source stacks.
+# org_baseline_state_prefix = "gcp-org-hierarchy/00-org-baseline"
+# folders_state_prefix      = "gcp-org-hierarchy/10-folders"
+
+# -----------------------------------------------------------------------------
+# REQUIRED — flip the master switch when ready.
+# -----------------------------------------------------------------------------
+
+enable_platform_projects = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — mode.
+# -----------------------------------------------------------------------------
+
+# organization_mode = "existing"
+
+# -----------------------------------------------------------------------------
+# 'create' mode — naming defaults produce IDs like gcp0-prj-emp-plogs-01.
+# Override only if your organisation's naming differs.
+# -----------------------------------------------------------------------------
+
+# org_prefix = "myco"
+# company    = "myco"
+# division   = "platform"   # empty by default; compacted out of the ID when unset
+# control    = "01"
+
+# -----------------------------------------------------------------------------
+# 'create' mode — per-role toggles. All true by default.
+# -----------------------------------------------------------------------------
+
+# enable_plogs    = true
+# enable_pmgm     = true
+# enable_piam     = true
+# enable_pdns     = true
+# enable_pingress = true
+# enable_sandbox  = true
+
+# -----------------------------------------------------------------------------
+# 'create' mode — extra service APIs per role. Merged on top of the shared
+# module's defaults (compute, cloudresourcemanager, iam).
+# -----------------------------------------------------------------------------
+
+# extra_services_by_role = {
+#   plogs    = ["logging.googleapis.com", "bigquery.googleapis.com"]
+#   pmgm     = ["cloudkms.googleapis.com", "secretmanager.googleapis.com"]
+#   piam     = ["iam.googleapis.com", "cloudidentity.googleapis.com"]
+#   pdns     = ["dns.googleapis.com"]
+#   pingress = ["compute.googleapis.com"]
+#   sandbox  = []
+# }
+
+# -----------------------------------------------------------------------------
+# 'existing' mode — required when organization_mode = "existing".
+# Provide project IDs for the roles you enabled.
+# -----------------------------------------------------------------------------
+
+# existing_project_ids = {
+#   plogs    = "gcp0-prj-emp-plogs-01"
+#   pmgm     = "gcp0-prj-emp-pmgm-01"
+#   piam     = "gcp0-prj-emp-piam-01"
+#   pdns     = "gcp0-prj-emp-pdns-01"
+#   pingress = "gcp0-prj-emp-pingress-01"
+#   sandbox  = "gcp0-prj-emp-psandbox-01"
+# }

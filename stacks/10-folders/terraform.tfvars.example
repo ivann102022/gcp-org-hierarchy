@@ -1,0 +1,63 @@
+###############################################################################
+# File:        stacks/10-folders/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the folders stack.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — remote-state pointer to 00-org-baseline.
+# -----------------------------------------------------------------------------
+
+org_baseline_state_bucket = "REPLACE-ME-tfstate-bucket"
+# org_baseline_state_prefix = "gcp-org-hierarchy/00-org-baseline"  # default; only override if you changed 00-org-baseline's backend prefix.
+
+# -----------------------------------------------------------------------------
+# REQUIRED — flip the master switch when you're ready to provision or read
+# folders. Default is false (no-op) to keep terraform apply safe on a fresh
+# checkout.
+# -----------------------------------------------------------------------------
+
+enable_folders = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — mode.
+# -----------------------------------------------------------------------------
+
+# organization_mode = "existing"
+
+# -----------------------------------------------------------------------------
+# 'create' mode inputs.
+# -----------------------------------------------------------------------------
+
+# Reference tree is on by default when enable_folders = true and mode = create.
+# create_reference_folder_tree = true
+
+# Uncomment to add Production / NonProduction under LandingZones:
+# reference_landing_zone_children = ["Production", "NonProduction"]
+
+# Uncomment to add custom folders (arbitrary depth via parent_key chain):
+# custom_folders = {
+#   Regulated = {
+#     display_name = "Regulated"
+#     parent_key   = "__org__"     # attaches to the Organization
+#   }
+#   RegulatedProd = {
+#     display_name = "Production"
+#     parent_key   = "Regulated"   # nests under the Regulated folder above
+#   }
+# }
+
+# -----------------------------------------------------------------------------
+# 'existing' mode inputs — required when organization_mode = "existing".
+# GCP has no by-display-name folder lookup data source at the org scope,
+# so IDs are provided explicitly.
+# -----------------------------------------------------------------------------
+
+# existing_folder_ids = {
+#   Platform       = "folders/1111111111"
+#   LandingZones   = "folders/2222222222"
+#   Sandbox        = "folders/3333333333"
+#   Production     = "folders/4444444444"     # if LandingZones/Production is in use
+#   NonProduction  = "folders/5555555555"
+# }

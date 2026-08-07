@@ -1,0 +1,61 @@
+###############################################################################
+# File:        .gitignore
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Global ignore rules to prevent Terraform state, credentials,
+#              service account keys, secrets, license files, and OS/IDE
+#              artifacts from being committed to the repository.
+###############################################################################
+
+# --- Terraform runtime ------------------------------------------------------
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# --- Terraform variables (may contain secrets or per-env values) ------------
+# Example / template files ARE allowed so consumers can copy them.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.template
+
+# --- Credentials & secrets --------------------------------------------------
+# Blanket-ignore JSON to prevent accidental commits of GCP service account
+# keys or exported gcloud config. Whitelist example/template JSON.
+*.json
+!*.example.json
+!*.template.json
+!package.json
+!package-lock.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.lic
+
+# --- GCP-specific -----------------------------------------------------------
+# Never commit gcloud config directories or application-default credential
+# files (usually live in $HOME but rule guards against copies).
+.gcloud/
+application_default_credentials.json
+gha-creds-*.json
+
+# --- OS artifacts -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+._*
+
+# --- IDE / editor artifacts -------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

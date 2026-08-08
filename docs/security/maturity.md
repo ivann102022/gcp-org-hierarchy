@@ -108,6 +108,30 @@ Missing any of these three would leave a gap: only column 1 reads as "he built o
 | **Enhanced** | Automated tag binding via Cloud Run / Cloud Function trigger on project creation. Tag-based IAM Condition examples in `custom_org_iam_bindings`. Tag-based org policy conditions in `30-org-policies`. BigQuery integration for tag-based cost attribution rollup. |
 | **High-isolation** | `compliance-scope` tag key with values `pci`/`hipaa`/`gdpr-strict`/`sovereign`/`none` bound on every project, triggering stricter policies via IAM Conditions. `criticality` tag for regulated tier-1 workloads with dedicated on-call / backup / DR alignment. Assured Workloads binding for regulated tenants. |
 
+### Per-stack Terraform deployment identities (portfolio-wide)
+
+Not tied to a specific ADR &mdash; a portfolio-wide maturity dimension surfaced during the section-50 review.
+
+| Dimension | Detail |
+|---|---|
+| **Current** | A small number of Terraform service accounts hold broad roles at Org scope (Project Creator, Org Policy Admin, Logging Admin). One SA may run multiple stacks. Sufficient for bootstrap and for portfolio-scale deployments. |
+| **Enhanced** | One dedicated Terraform SA per Tier-0 stack (`sa-tf-00-org-baseline`, `sa-tf-10-folders`, `sa-tf-20-projects`, `sa-tf-30-org-policies`, `sa-tf-40-org-logging`, `sa-tf-50-org-iam`, `sa-tf-60-tags`). Each SA holds only the roles its stack needs at the scope its stack acts on. Blast radius of a compromised CI credential is bounded to that stack's resources. |
+| **High-isolation** | Per-stack SAs plus PAM/JIT elevation for the Terraform apply operation itself: the SA holds no permissions at rest; a scheduled or on-demand entitlement grants it the required roles for the duration of an apply, then removes them. Combined with audit alerting on each entitlement grant, this reduces the "compromised CI = compromised Org" scenario to a much narrower window. |
+
+Retiring the default broad grants GCP applies on Organization creation (`domain:<org>.com` &rarr; `roles/resourcemanager.projectCreator` / `roles/billing.creator`) is the first concrete step in this direction and is part of the steady-state framing in [`50-org-iam` README](../../stacks/50-org-iam/README.md).
+
+### Access authorization guardrails via IAM Deny (portfolio-wide)
+
+Complementary to allow-based IAM. Not currently in the portfolio; documented here as a maturity direction.
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Only allow-based bindings (`google_organization_iam_member` and equivalents). Access = union of granted roles minus what constraints (org policies) prevent as configurations. |
+| **Enhanced** | Add `google_iam_deny_policy` at Org or Folder scope for specific critical permissions (`iam.serviceAccountKeys.create`, `resourcemanager.projects.delete`, `logging.sinks.delete`, `billing.accounts.close`). Deny policies override allow policies (subject to constraint semantics), giving hard "no matter what role you have, you cannot do X" guardrails. Complements `30-org-policies` (which prevents *configurations*) with prevention of *actions*. |
+| **High-isolation** | Deny catalog per compliance regime (PCI / GDPR / regulated) attached at the relevant folder branches; IAM Conditions on deny exceptions require named principal + time window + justification. |
+
+This is what 30 (Prevent-configuration) + 40 (Detect-action) + 50 (Authorize-principal) can become together at higher maturity: 30 blocks configurations, 40 sees what happens, 50 authorizes *what a principal can even attempt*, and IAM Deny closes the loop by *hard-blocking specific attempts*.
+
 ### Anchor + baseline for stack `00-org-baseline` ([ADR-0007](../adr/0007-content-rule-for-org-baseline.md))
 
 | Dimension | Detail |

@@ -91,16 +91,40 @@ Language convention: "supports controls typically found in ..." not "complies wi
 
 **Current implementation** &mdash; dedicated `break_glass_principals` variable, alert-friendly output, obs-baseline consuming the principals list for log-based alert filtering. Operational procedures (group membership, SLA for removal, incident ticketing) are documented but not enforced by Terraform.
 
-**Enhanced**:
+**Enhanced &mdash; operational hardening around the current model**:
 - Add IAM Conditions on the break-glass binding so it is only active during declared incident windows (via `request.time` conditions or Access Context Manager access levels).
 - Add automated group membership expiration via Cloud Identity APIs (member auto-removed after N hours).
 - Add a `break_glass_activated` custom metric + dashboard in obs-baseline so incidents are visible at a glance.
 - Integrate with incident management system (ServiceNow / PagerDuty / Opsgenie) so break-glass activation opens an incident ticket automatically.
 
+**Enhanced+ &mdash; Privileged Access Manager (PAM) / Just-in-Time elevation**:
+- Migrate the break-glass model from a persistent (empty-by-default) group binding to a PAM entitlement. Google Cloud's Privileged Access Manager (and equivalent third-party tools) support JIT elevation with justification, approval workflow, MFA reinforcement, time-bounded expiration, and native audit &mdash; break-glass is the canonical use case Google cites.
+- The persistent-group model I ship today is defensible for portfolio purposes (a documented recovery capability, low operational overhead). PAM is the industry-current maturity direction, and I would move to it once the customer's identity operations team is ready to own the approval workflow.
+- Trade-off: PAM adds a workflow dependency (approval group must be reachable when needed) and an integration surface with the identity platform &mdash; both worth it in mature ops environments; overhead worth deferring in bootstrap phases.
+
 **High-isolation option**:
-- Multi-party approval for break-glass activation (two humans required to add a member to the group).
+- Multi-party approval for break-glass activation (two humans required to add a member to the group or to approve the PAM entitlement).
 - Cross-org sign-off for break-glass in regulated tenants (dedicated approver group in a separate GCP org / Workspace).
-- Time-limited break-glass tokens via Workload Identity Federation with short TTL, replacing group membership.
+- Time-limited break-glass tokens via Workload Identity Federation with short TTL, replacing persistent group membership entirely.
+
+## Failure independence for the emergency path
+
+A separate concern that any break-glass design must address: **the emergency access path must survive failures of the normal access path**.
+
+If normal access to GCP is:
+
+```
+Corporate IdP → Workforce Federation → GCP
+```
+
+and that path fails (IdP outage, federation misconfiguration, network partition to the IdP), a break-glass identity that depends on the *same* path is not a break-glass identity &mdash; it fails in the same failure mode.
+
+Design requirement for a genuine break-glass model:
+
+- The emergency principal (or the mechanism to activate the emergency principal) must be reachable via a path independent of the normal federation flow. Options include: a Workspace / Cloud Identity user with password + hardware MFA that can authenticate to Google directly (no federation required); a service account key stored offline in a break-glass safe (not recommended by modern practice but historically used); a PAM entitlement whose approval workflow runs through a separate identity plane.
+- The design must be tested. Testing means occasionally exercising the emergency path (not just documenting it) to confirm it works when needed.
+
+This concern is out of scope for the Terraform in this stack &mdash; failure independence is a design decision that spans identity, network, and operational tooling. But every break-glass ADR should acknowledge it as a required consideration and document which independence path applies to the specific deployment.
 
 Full portfolio-level roadmap in [`../security/maturity.md`](../security/maturity.md).
 

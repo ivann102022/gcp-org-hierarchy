@@ -23,7 +23,7 @@ Break-glass model documented in [ADR-0013](../../docs/adr/0013-break-glass-user-
 |---|---|---|
 | `org_admins` | `roles/resourcemanager.organizationAdmin` | Small platform-admin group. Most privileged role in GCP &mdash; treat with matching operational discipline. |
 | `project_creators` | `roles/resourcemanager.projectCreator` | Terraform SA(s) that run Tier 0 stack `20-projects` + any LZ that has `create_projects = true` fallback. |
-| `billing_admins` | `roles/billing.admin` | Finance-approved small group. |
+| `billing_admins` | `roles/billing.admin` | ⚠️ **Under review** &mdash; see [docs/pending-corrections.md](../../docs/pending-corrections.md). `roles/billing.admin` has lowest-level grantable resource = Billing Account (not Organization); binding it at Org scope with `google_organization_iam_member` does not match the role's intended scope. Fix direction: use `roles/billing.creator` for Org-scope billing account creation, or migrate to a dedicated `google_billing_account_iam_member` for administering a specific Billing Account. |
 | `security_admins` | `roles/iam.securityAdmin` | SecOps team. Grants ability to modify IAM policies org-wide. |
 | `logging_admins` | `roles/logging.admin` | Terraform SA for `40-org-logging` + observability team. |
 | `orgpolicy_admins` | `roles/orgpolicy.policyAdmin` | Terraform SA for `30-org-policies`. |
@@ -32,10 +32,20 @@ Break-glass model documented in [ADR-0013](../../docs/adr/0013-break-glass-user-
 
 `break_glass_principals` is separated from `org_admins` so an alert (in `gcp-observability-baseline`) can fire specifically when a break-glass principal performs an action.
 
+## Principles for org-scope IAM
+
+Three principles frame every entry in the curated role set above:
+
+**Groups first for humans**. Bindings for human principals should target Google Groups (or federated IdP groups), not individual users. Cloud architecture decides *which group receives which role*; identity lifecycle (people joining / leaving / rotating) is managed in Cloud Identity / Workspace / the IdP. The tfvars examples show `group:...` entries deliberately; individual users appear only for the Terraform service accounts (`serviceAccount:...`) and for edge cases like a single named break-glass user.
+
+**Role + Scope = Blast Radius**. An IAM binding is not defensible by role alone. `roles/iam.securityAdmin` at project scope grants a SecOps engineer authority over IAM in one project; the same role at Organization scope grants authority over IAM across every project in every folder. This stack grants org-scope roles by design (it exists for that purpose) but every entry in the curated set requires an ADR-level justification for the *scope*, not just for the *role*. See [ADR-0013](../../docs/adr/0013-break-glass-user-model.md) for the framing applied to break-glass.
+
+**Bootstrap vs steady-state**. `roles/resourcemanager.organizationAdmin` belongs conceptually to this stack, but is *not* the operational identity of the cloud platform team in steady state. Bootstrap flow: Workspace / Cloud Identity Super Admin grants Organization Administrator to the initial platform-admin group; Terraform then constructs the delegated bindings this stack manages; the initial broad grant (and any default domain-wide `Project Creator` / `Billing Account Creator` grants GCP applies to the whole domain on Org creation) is retired in favour of least-privilege per-team and per-Terraform-SA bindings. Steady-state Organization Admin membership should be extraordinarily restricted; day-to-day operations use the narrower roles (Project Creator, Security Admin, Logging Admin, Org Policy Admin).
+
 ## Explicitly excluded
 
 - **Workforce Identity Federation** &mdash; project-scope resource that belongs in `gcp-identity-baseline` (Tier 1). See [ADR-0004](../../docs/adr/0004-no-workforce-identity-federation-here.md).
-- **Custom roles** (`google_organization_iam_custom_role`) &mdash; identity discipline; belongs in `gcp-identity-baseline`.
+- **Custom roles** &mdash; **definition and lifecycle** of the custom-role catalog belong to `gcp-identity-baseline` (identity discipline). This stack only **consumes** those roles when it needs Org-scope bindings (via `custom_org_iam_bindings`). The define / bind separation lets the two disciplines evolve independently.
 - **Folder- or project-scope IAM bindings** &mdash; those live at their respective scopes (managed by the folder or project owner).
 - **IAM Conditions** on org-scope bindings &mdash; not in v0.1.0 of this stack. Add via `custom_org_iam_bindings` with your own resource definitions when needed.
 

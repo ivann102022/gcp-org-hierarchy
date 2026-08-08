@@ -77,6 +77,19 @@ This is a concrete instance of the general principle in [ADR-0009](0009-layered-
 
 Bundling them into a single folder means change reviews mix "network peering added" with "app v3.2.1 deployed" &mdash; either the reviews are too heavy for the frequent changes or too light for the rare ones. Splitting lets each folder have its own change model.
 
+## The ownership-first vs environment-first choice
+
+The tree I chose puts **function/ownership at level 2** (HostPrj / ServicePrj) and **environment at level 3** (PRO / PRE / DEV). The alternative &mdash; environment at level 2, function at level 3 &mdash; is technically equivalent in resource count but semantically very different in what it optimises for.
+
+The question underneath is: **what is the first frontier of governance under `LandingZones`?**
+
+- **My answer**: function/ownership. Under `LandingZones`, the primary IAM delegation is *who operates this class of project* (Network+Security vs Systems+Applications). Once that boundary is drawn, environment is a within-team specialisation. `roles/compute.networkAdmin` at `HostPrj` folder scope grants across all envs to the Network team &mdash; who is exactly the person who should have it across all envs, because the network team owns Host Projects everywhere. The env split under `HostPrj` then lets the same team apply stricter policies to `PRO` than to `DEV`.
+- **Env-first would answer**: environment. `LandingZones/PRO/{HostPrj, ServicePrj}` groups everything production first. Suits an org where PRO / PRE / DEV boundaries are the primary access-control axis (e.g. compliance-scoped PRO with different auditors from PRE/DEV) and where the network vs systems team split is secondary.
+
+I chose function/ownership first because it matches the operational reality of the customers I have delivered for: the network team owns the host projects across environments; the systems team owns the service projects across environments; environment is a policy-strength gradient inside each ownership domain, not a team boundary.
+
+**This choice is intentional and specific to my target customer profile.** For a customer whose compliance regime forces PRO to have a distinct operational team from PRE/DEV (regulated tier-1 workloads with separate change-window rules, separate on-call), env-first would be the correct call. See Alternative B below for the concrete rejection.
+
 ## Composite keys for grandchildren
 
 `PRO` (and `PRE`, `DEV`) appears under both `HostPrj` and `ServicePrj`. GCP allows this because display-name uniqueness is enforced **per parent**, not globally. But Terraform's flat map (`for_each` over `local.all_folders`) needs unique keys.
@@ -106,7 +119,7 @@ Downstream consumers look up `folder_ids["HostPrj-PRO"]`, not `folder_ids["PRO"]
 Rejected. Loses env-scope IAM inheritance. Per-env grants would need per-project bindings, defeating the folder inheritance benefit and breaking Reason 1 above (per-team access at scale). I have never delivered this in practice for LZs beyond single-tenant demos.
 
 **B. Env-first &mdash; `LandingZones/PRO/{HostPrj, ServicePrj}`, `LandingZones/PRE/...`, `LandingZones/HUB`.**
-Rejected. HUB does not fit &mdash; it sits at the same level as env roots but is not an env. Also fights Reason 1: `HostPrj` and `ServicePrj` are the primary ownership boundaries (network vs systems teams); splitting them across the env axis at level 2 puts the wrong dimension first for IAM purposes.
+Rejected for my target customer profile (see "The ownership-first vs environment-first choice" above). Legitimate alternative for customers where environment boundaries are the primary access-control axis (regulated tier-1 with separate PRO team from PRE/DEV, distinct compliance auditors per env). Technical reasons it also does not fit here: HUB sits at the same level as env roots but is not an env (structural mismatch); and the primary IAM delegation in my customer profile is network-team-across-envs vs systems-team-across-envs &mdash; env-first would force per-env IAM bindings for those teams instead of inheritance.
 
 **C. Role-first without composite keys &mdash; nested map with recursive resource block.**
 Rejected. I tried the Terraform recursive folder module pattern in earlier work; the added complexity of nested-map propagation outweighs the string-concat savings. Composite keys in a flat map are boring and correct.

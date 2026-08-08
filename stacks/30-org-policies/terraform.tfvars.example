@@ -1,0 +1,78 @@
+###############################################################################
+# File:        stacks/30-org-policies/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the org-policies stack.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — remote-state pointer to 00-org-baseline.
+# -----------------------------------------------------------------------------
+
+org_baseline_state_bucket = "REPLACE-ME-tfstate-bucket"
+
+# -----------------------------------------------------------------------------
+# REQUIRED — flip the master switch to activate the stack.
+# -----------------------------------------------------------------------------
+
+enable_org_policies = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — dry-run defaults. Per ADR-0011, all policies default to dry-run
+# on first apply so violations surface in the audit log without blocking.
+# Promote individual policies to enforce via enforce_overrides once you've
+# validated they don't break live workloads.
+# -----------------------------------------------------------------------------
+
+# default_dry_run = true    # safe default; ONLY change to false org-wide with full validation
+
+# enforce_overrides = {
+#   disable_sa_keys                = true    # confidence-tested; safe to enforce
+#   prevent_public_storage          = true    # safe to enforce day 1
+#   deny_external_ip                = false   # leave in dry-run until Cloud NAT is confirmed for all workloads
+# }
+
+# -----------------------------------------------------------------------------
+# CURATED CATALOG — 8 policies, each opt-in via its own enable_* switch.
+# Recommendation: enable in this order (rough safety gradient):
+#   1. prevent_public_storage        — very high signal, near-zero false positive
+#   2. disable_sa_keys                — WIF-first workflows tolerate this
+#   3. restrict_sql_public_ip         — private SQL is best practice anyway
+#   4. require_oslogin                 — after SSH via IAM tested with real users
+#   5. deny_external_ip                — after Cloud NAT verified for all VMs
+#   6. resource_locations              — after audit shows workloads honour EU-only (or your target)
+#   7. allowed_policy_member_domains   — requires allowed_customer_ids populated
+#   8. trusted_image_projects           — after golden images catalogued
+# -----------------------------------------------------------------------------
+
+# enable_prevent_public_storage        = true
+# enable_disable_sa_keys                = true
+# enable_restrict_sql_public_ip         = true
+# enable_require_oslogin                = true
+# enable_deny_external_ip               = true
+
+# enable_resource_locations             = true
+# allowed_locations = ["in:eu-locations"]   # or specific regions: ["europe-west1", "europe-west4"]
+
+# enable_allowed_policy_member_domains  = true
+# allowed_customer_ids = ["C0123abcd", "C0456efgh"]   # from `gcloud organizations list`
+
+# enable_trusted_image_projects         = true
+# trusted_image_projects = [
+#   "projects/debian-cloud",
+#   "projects/ubuntu-os-cloud",
+#   "projects/cos-cloud",
+#   "projects/gcp0-prj-emp-images-01",   # your custom golden images project
+# ]
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — custom org policies (outside the curated catalog).
+# -----------------------------------------------------------------------------
+
+# custom_org_policies = {
+#   deny_gke_legacy_endpoints = {
+#     constraint = "container.disableLegacyAuthorization"
+#     rules = [{ enforce = true }]
+#     dry_run = true
+#   }
+# }

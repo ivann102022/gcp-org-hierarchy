@@ -76,6 +76,38 @@ Missing any of these three would leave a gap: only column 1 reads as "he built o
 | **High-isolation** | HUB-per-environment (`HUB-PRO`, `HUB-PRE`, `HUB-DEV`) with independent FortiGate HA clusters. 3&#x00D7; cost accepted for full environmental isolation. Warranted for: PCI CDE, sovereign-cloud requirements, multi-tenant SaaS with different customer trust domains per env. |
 | **Dedicated CDE / regulated overlay** | Fourth HUB (`HUB-REGULATED`) alongside the shared HUB, dedicated to CDE or regulated-workload traffic. Distinct cluster, rules, and audit trail scoped to the compliance obligation. |
 
+### Curated org-policy catalog ([ADR-0011](../adr/0011-curated-org-policy-catalog.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | 8-policy catalog (disable_sa_keys, require_oslogin, deny_external_ip, prevent_public_storage, restrict_sql_public_ip, allowed_policy_member_domains, trusted_image_projects, resource_locations) with per-policy enable switches and dry-run default. `custom_org_policies` for additions. |
+| **Enhanced** | Custom constraints via `google_org_policy_custom_constraint`. IAM Conditions on policies (e.g. "except in sandbox folder"). Policy Controller / Config Sync gating on PRs. Bundled "safe-to-enforce day 1" mode. |
+| **High-isolation** | VPC Service Controls perimeters as org-scope constraints for regulated projects. Access Context Manager access levels referenced by org-policy conditions. Assured Workloads binding constraints for FedRAMP / IL / EU sovereign. Per-folder policy overrides (stricter in PRO, looser in Sandbox). |
+
+### Org sink design ([ADR-0012](../adr/0012-org-sink-design.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Single org sink to `plogs` log bucket (default `_Default`, override to custom); `include_children = true`; empty filter; IAM binding owned by Tier 0 stack 40. |
+| **Enhanced** | Multiple sinks via `custom_sinks` for per-team / per-compliance-scope routing (e.g. PCI logs to dedicated bucket with 10-year retention). Sink-level exclusions catalog for high-volume noise. Direct BigQuery routing for near-real-time analytics. |
+| **High-isolation** | Dedicated org sinks per compliance regime (`sink_pci`, `sink_gdpr`, `sink_regulated`) each routing to isolated destination projects. CMEK on destination log buckets. Immutable retention (Object Lock equivalent) for tamper-evidence. |
+
+### Break-glass user model ([ADR-0013](../adr/0013-break-glass-user-model.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Dedicated `break_glass_principals` variable (typically a group with empty membership). Log-based alert in obs-baseline consumes the principals list. Operational procedures for membership rotation documented but not enforced. |
+| **Enhanced** | IAM Conditions on break-glass binding (active only during declared incident windows via `request.time` or Access Context Manager access levels). Automated group membership expiration via Cloud Identity APIs. `break_glass_activated` custom metric + dashboard. Integration with incident management system for auto-ticketing. |
+| **High-isolation** | Multi-party approval for break-glass activation (two humans required). Cross-org sign-off for regulated tenants. Time-limited break-glass tokens via WIF with short TTL, replacing group membership. |
+
+### Tag catalog + opt-in ([ADR-0014](../adr/0014-tag-catalog-choice.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | 4-key reference catalog opt-in (environment, data-classification, cost-center opt-in, owner opt-in). `custom_tag_keys` for extensions. `purpose = "GCE_FIREWALL"` for max compatibility. |
+| **Enhanced** | Automated tag binding via Cloud Run / Cloud Function trigger on project creation. Tag-based IAM Condition examples in `custom_org_iam_bindings`. Tag-based org policy conditions in `30-org-policies`. BigQuery integration for tag-based cost attribution rollup. |
+| **High-isolation** | `compliance-scope` tag key with values `pci`/`hipaa`/`gdpr-strict`/`sovereign`/`none` bound on every project, triggering stricter policies via IAM Conditions. `criticality` tag for regulated tier-1 workloads with dedicated on-call / backup / DR alignment. Assured Workloads binding for regulated tenants. |
+
 ### Anchor + baseline for stack `00-org-baseline` ([ADR-0007](../adr/0007-content-rule-for-org-baseline.md))
 
 | Dimension | Detail |

@@ -74,6 +74,15 @@ Rows = architectural decisions from this repo's ADRs. Columns = framework areas.
 | Org log sink in Tier 0, not obs baseline | [0003](../adr/0003-org-sink-in-tier0-not-obs-baseline.md) | Art. 21 incident detection, logging | A.8 logging and monitoring, A.5 access control (least privilege for logging management) | DE.AE (anomalies and events), PR.PT (protective technology, audit capability) | AU-2 (event logging), AU-12 (audit record generation), AC-6 | Logging section (aggregate at org level) | Operational excellence + security pillars |
 | WIF in identity-baseline, not Tier 0 | [0004](../adr/0004-no-workforce-identity-federation-here.md) | Art. 21 access control | A.5 access control, A.5 privileged access, A.8 identity management | PR.AA (identity management, access control) | AC-2 (account management), AC-6 (least privilege) | IAM section | Security pillar: least-privilege scoping |
 
+### Governance & enforcement (v0.4.0)
+
+| Decision | ADR | NIS2 | ISO 27001/27002 | NIST CSF | NIST SP 800-53 | CIS GCP | Google CAF |
+|---|---|---|---|---|---|---|---|
+| Curated org-policy catalog + dry-run default | [0011](../adr/0011-curated-org-policy-catalog.md) | Art. 21 risk management measures | A.5 policies, A.8 access control + cryptography + system acquisition | PR.IP (information protection processes) | CM-6 (configuration settings), CM-7 (least functionality) | Direct alignment &mdash; every catalog policy corresponds to a CIS recommendation | Security pillar: platform-layer hardening |
+| Org sink design (filter/destination/IAM) | [0012](../adr/0012-org-sink-design.md) | Art. 21 incident detection + logging | A.8 logging and monitoring | DE.AE + DE.CM, PR.PT (audit capability) | AU-2, AU-4, AU-12 | Logging section (aggregate sink, filter, retention) | Operational excellence + security pillars |
+| Break-glass user model | [0013](../adr/0013-break-glass-user-model.md) | Art. 21 incident handling + recovery | A.5 privileged access management, A.5 incident management | RS (Respond), PR.AA (privileged access) | AC-2 (privileged accounts), AC-6, IR family (incident response) | IAM: minimal use of primitive roles at high scope | Security + operational excellence pillars |
+| Tag catalog + opt-in default | [0014](../adr/0014-tag-catalog-choice.md) | Art. 21 asset management + risk categorisation | A.5 information classification (`data-classification` direct), A.5 asset management | ID.AM (asset management, classification) | RA-2 (security categorisation) | Asset management principles | Governance patterns (tag-based policy, cost attribution) |
+
 ### Engineering / project conventions
 
 | Decision | ADR | Framework relevance |
@@ -100,16 +109,17 @@ The following framework areas are relevant to enterprise GCP architectures but a
 - Tier 2 landing zones &mdash; workload-level controls.
 - Operational processes outside Terraform &mdash; incident response, DR testing, awareness training.
 
-Gaps at the Tier 0 level:
+Gaps at the Tier 0 level (v0.4.0):
 
-| Framework area | Not yet addressed by this repo | Planned in |
-|---|---|---|
-| Org-level policy enforcement (NIS2 Art. 21 risk management, ISO A.5 policies) | Yes | `30-org-policies` (planned v0.3.0) |
-| Central audit logging enforcement | Partially (this repo's sink integration is deferred to v0.3.0) | `40-org-logging` (planned v0.3.0) |
-| Privileged access management | Partially (Org Admin binding, break-glass) | `50-org-iam` (planned v0.4.0) |
-| Resource classification / tagging | Yes | `60-tags` (planned v0.4.0) |
-| Detection / SIEM integration | No | `gcp-observability-baseline` (Tier 1, shipped v0.1.0 &mdash; scope is central log storage + exports; SIEM ingestion is per-customer) |
-| Vulnerability management | No | Not in Terraform scope; operational |
-| Incident response | No | Not in Terraform scope; operational |
+| Framework area | Status |
+|---|---|
+| Org-level policy enforcement (NIS2 Art. 21 risk management, ISO A.5 policies) | Shipped in `30-org-policies` (v0.4.0) &mdash; curated catalog of 8 policies with dry-run default. |
+| Central audit logging enforcement | Shipped in `40-org-logging` (v0.4.0) &mdash; org sink with writer-identity IAM. |
+| Privileged access management | Shipped in `50-org-iam` (v0.4.0) &mdash; curated role set + break-glass model. |
+| Resource classification / tagging | Shipped in `60-tags` (v0.4.0) &mdash; opt-in reference catalog with `environment`, `data-classification`, `cost-center`, `owner`. |
+| Detection / SIEM integration | Partial &mdash; `gcp-observability-baseline` handles log routing + curated alert catalog; SIEM integration itself is per-customer downstream tooling. |
+| Vulnerability management | No | Not in Terraform scope; operational. |
+| Incident response | Partial &mdash; break-glass model (ADR-0013) is the Terraform-visible piece; the full IR playbook is operational. |
+| Data-plane segmentation (VPC-SC, PSC) | No &mdash; deferred to Scale 4 (see [ADR-0009](../adr/0009-layered-segmentation-hierarchy-first.md) maturity path). Warranted for regulated / sovereign tenants. |
 
 Being explicit about the gaps is itself a portfolio-quality signal. A reviewer who sees "we do X, we don't yet do Y, here's when Y lands" reads it as honest engineering; a reviewer who sees implicit gaps and unstated assumptions reads it as over-selling.

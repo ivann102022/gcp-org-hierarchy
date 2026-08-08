@@ -51,10 +51,10 @@ Numbered by dependency. Each stack is independent and ships the standard 9 files
 | `00-org-baseline` | Anchor + baseline (see section above): references the GCP Organization + essential contacts at org scope | `existing` / `create` | Shipped v0.1.0 |
 | `10-folders` | Provisions the folder tree with depth up to 3 (see [Folder tree](#folder-tree) below) | `existing` / `create` | Shipped v0.1.0 · v0.2.0 refactor pending |
 | `20-projects` | Platform project factory (`plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox`) with 1:1 home folder mapping via the shared `projects` module | `existing` / `create` | Shipped v0.1.0 · v0.2.0 refactor pending |
-| `30-org-policies` | Curated `google_org_policy_policy` catalogue with `enable_X` switches (dry-run by default) | Any mode | Planned v0.3.0 |
-| `40-org-logging` | `google_logging_organization_sink` &rarr; `plogs`, writer identity IAM | Any mode | Planned v0.3.0 |
-| `50-org-iam` | Org-level IAM bindings + break-glass roles | Any mode | Planned v0.4.0 |
-| `60-tags` | Org-scoped Resource Manager tag keys / values | Any mode (opt-in) | Planned v0.4.0 |
+| `30-org-policies` | Curated `google_org_policy_policy` catalogue (8 policies) with `enable_X` switches (dry-run by default) &mdash; [ADR-0011](docs/adr/0011-curated-org-policy-catalog.md) | Any mode | Shipped v0.4.0 |
+| `40-org-logging` | `google_logging_organization_sink` &rarr; `plogs`, writer identity IAM &mdash; [ADR-0012](docs/adr/0012-org-sink-design.md) | Any mode | Shipped v0.4.0 |
+| `50-org-iam` | Org-level IAM bindings + break-glass model &mdash; [ADR-0013](docs/adr/0013-break-glass-user-model.md) | Any mode | Shipped v0.4.0 |
+| `60-tags` | Org-scoped Resource Manager tag keys / values &mdash; [ADR-0014](docs/adr/0014-tag-catalog-choice.md) | Any mode (opt-in) | Shipped v0.4.0 |
 
 ## Folder tree (v0.2.0)
 
@@ -133,10 +133,10 @@ Full spec &mdash; including planned outputs for stacks `30`-`60` &mdash; in [doc
     ├── 00-org-baseline/         Shipped (v0.1.0)
     ├── 10-folders/              Shipped v0.1.0 · v0.2.0 refactor (depth 3 + composite keys)
     ├── 20-projects/             Shipped v0.1.0 · v0.2.0 refactor (home folder mapping)
-    ├── 30-org-policies/         Planned v0.3.0
-    ├── 40-org-logging/          Planned v0.3.0
-    ├── 50-org-iam/              Planned v0.4.0
-    └── 60-tags/                 Planned v0.4.0
+    ├── 30-org-policies/         Shipped v0.4.0
+    ├── 40-org-logging/          Shipped v0.4.0
+    ├── 50-org-iam/              Shipped v0.4.0
+    └── 60-tags/                 Shipped v0.4.0
 ```
 
 No `modules/` folder &mdash; reusable primitives live in [`shared-modules/terraform-gcp-modules`](../../shared-modules/terraform-gcp-modules/) (currently consumed: the `projects` module, pinned at `v0.1.0`).
@@ -197,6 +197,7 @@ The prefix always points to the specific Tier 0 stack that publishes the needed 
 - **v0.1.0** shipped. Stacks `00-org-baseline`, `10-folders`, `20-projects` populated. Stacks `30`-`60` scaffolded with placeholder READMEs.
 - **v0.2.0** shipped. Folder tree extended to depth 3 with 1:1 platform children (`Logs`/`Management`/`IAM`/`DNS`/`Ingress`) + `HostPrj`/`ServicePrj` env-split under `LandingZones` (ADR-0005, ADR-0006); role &rarr; home folder mapping in `20-projects` with `moved` blocks for in-place state migration; anchor + baseline framing formalised across docs + ADR-0007 (content rule); ADR-0008 (ingress bypasses perimeter appliance).
 - **v0.3.0** &mdash; documentation-only release. Two new ADRs (0009 layered segmentation principle, 0010 single-HUB rationale with economic + architectural 2-layer justification). Existing ADRs enriched with Rationale / Trade-offs / Controls supported / Maturity path sections. New `docs/security/` folder with `control-mapping.md` (decision &times; framework matrix) and `maturity.md` (per-decision current / enhanced / high-isolation roadmap). Portfolio framing statement added.
+- **v0.4.0** shipped. Stacks `30-org-policies`, `40-org-logging`, `50-org-iam`, `60-tags` populated (all 7 stacks now live). Four new ADRs: 0011 curated org-policy catalog with dry-run-first workflow, 0012 org sink design, 0013 break-glass user model, 0014 tag catalog choice. ADR-0003 updated with v0.4.0 note on writer-identity IAM ownership split. Every new ADR follows the v0.3.0 enrichment convention (Rationale / Trade-offs / Controls supported / Maturity path). `control-mapping.md` and `maturity.md` extended with the four new decisions.
 
 ## Layered segmentation &mdash; the portfolio principle
 

@@ -1,0 +1,46 @@
+###############################################################################
+# File:        stacks/60-tags/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the tags stack.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — remote-state pointer.
+# -----------------------------------------------------------------------------
+
+org_baseline_state_bucket = "REPLACE-ME-tfstate-bucket"
+
+# -----------------------------------------------------------------------------
+# REQUIRED — flip the master switch (opt-in by default).
+# -----------------------------------------------------------------------------
+
+enable_tags = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — reference catalog. Ship with sensible defaults; override per
+# customer.
+# -----------------------------------------------------------------------------
+
+# create_reference_tag_set = true   # default; provisions environment + data-classification + optional cost-center + optional owner
+
+# reference_environment_values = ["prod", "preprod", "dev"]   # lowercase; matches folder tree
+# reference_data_classification_values = ["public", "internal", "confidential", "restricted"]
+
+# enable_cost_center_tag = true   # default; free-form values (populate per customer)
+# enable_owner_tag        = true   # default; free-form values
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — custom tag keys outside the reference set.
+# -----------------------------------------------------------------------------
+
+# custom_tag_keys = {
+#   compliance-scope = {
+#     description = "Compliance regime the resource is in scope for (pci / hipaa / gdpr-only / none)."
+#     values      = ["pci", "hipaa", "gdpr-only", "none"]
+#   }
+#   application = {
+#     description = "Application short-name for cost / ownership attribution."
+#     values      = []   # free-form
+#   }
+# }

@@ -1,0 +1,83 @@
+###############################################################################
+# File:        stacks/40-org-logging/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the org-logging stack.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — remote-state pointers.
+# -----------------------------------------------------------------------------
+
+org_baseline_state_bucket = "REPLACE-ME-tfstate-bucket"
+org_projects_state_bucket = "REPLACE-ME-tfstate-bucket"
+
+# -----------------------------------------------------------------------------
+# REQUIRED — flip the master switch.
+# -----------------------------------------------------------------------------
+
+enable_org_sink = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — naming.
+# -----------------------------------------------------------------------------
+
+# org_prefix = "gcp0"
+# control    = "01"
+# sink_name  = "central"    # → resource name: gcp0-orgsink-central-01
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — sink filter. Default "" (all logs). Common cost-control overrides:
+# -----------------------------------------------------------------------------
+
+# sink_filter = "severity>=WARNING"
+# sink_filter = "resource.type=\"gce_instance\" OR resource.type=\"k8s_cluster\""
+# sink_filter = "protoPayload.serviceName!=\"loadbalancing.googleapis.com\""
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — sink scope. Almost always keep include_children = true.
+# -----------------------------------------------------------------------------
+
+# include_children = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — destination. Default routes to plogs's _Default log bucket.
+# Override to route to a custom bucket (typically the one provisioned by
+# gcp-observability-baseline/00-log-storage).
+# -----------------------------------------------------------------------------
+
+# destination_type              = "log_bucket"
+# destination_log_bucket         = "gcp0-log-bucket-default-01"   # custom bucket in plogs
+# destination_log_bucket_location = "eu"
+
+# Alternative destination types (rarely used at the org sink level; prefer
+# per-destination sinks in obs-baseline/10-log-exports):
+
+# destination_type      = "bigquery"
+# destination_override  = "bigquery.googleapis.com/projects/gcp0-prj-emp-plogs-01/datasets/gcp0_logs_default_01"
+
+# destination_type      = "pubsub"
+# destination_override  = "pubsub.googleapis.com/projects/gcp0-prj-emp-plogs-01/topics/gcp0-log-topic-default-01"
+
+# destination_type      = "storage"
+# destination_override  = "storage.googleapis.com/gcp0-log-archive-default-01"
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — writer identity binding. Default true. Set to false if
+# gcp-observability-baseline is handling the binding via its deferred hook
+# (transitional; recommended to keep true and disable the obs-baseline hook).
+# -----------------------------------------------------------------------------
+
+# create_writer_identity_binding = true
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — sink-level exclusions (filter out logs before they hit the
+# destination while keeping them in each project's own log bucket).
+# -----------------------------------------------------------------------------
+
+# exclusions = {
+#   loadbalancer_healthchecks = {
+#     description = "Drop L7 LB health-check probe results — very high volume, low value at org level."
+#     filter      = "resource.type=\"http_load_balancer\" AND httpRequest.userAgent:\"GoogleHC\""
+#   }
+# }

@@ -2,24 +2,115 @@
 File:        stacks/60-tags/README.md
 Author:      Ismael Cruz
 Version:     0.1.0
-Description: Placeholder for the tags stack — planned for v0.3.0.
-             Not yet scaffolded with HCL.
+Description: Documentation for the tags stack — Resource Manager tag keys
+             and values at Organization scope, opt-in by default.
 -->
 
-# Stack `60-tags` (planned v0.3.0)
+# Stack `60-tags`
 
-Resource Manager tag keys and tag values at the Organization scope for cross-tier governance (e.g. `environment=prod|nonprod`, `data-classification=public|internal|confidential`). Also demonstrates one tag-based IAM condition as a reference example.
+Provisions **Resource Manager tag keys and tag values** at Organization scope for cross-tier governance: tag-based IAM Conditions, tag-based org policy exceptions, tag-based hierarchical firewall rules, cost attribution via billing labels linked to tags.
 
-**Not yet implemented.** Scaffolded as an empty directory to reserve the stack number and document intent. Implementation lands in v0.3.0.
+Opt-in (`enable_tags = false` by default) because tagging introduces ongoing operational cost &mdash; the value is only realised if downstream consumers actually bind tags to resources with discipline. Design rationale in [ADR-0014](../../docs/adr/0014-tag-catalog-choice.md).
 
-Opt-in by default (`create_tags = false`): tags are useful but not universally required, and creating them introduces a small ongoing operational cost (tag propagation, tag inheritance semantics on folder moves).
+## What it owns
 
-## Planned outputs
+- `google_tags_tag_key` &mdash; one per entry in the merged catalog (reference + custom).
+- `google_tags_tag_value` &mdash; one per (key, value) pair. Parented to the tag key so Terraform's dependency graph orders creation correctly.
 
-- `tag_keys` &mdash; tag key display name &rarr; ID.
-- `tag_values` &mdash; `"<key>/<value>"` &rarr; ID.
+Every key ships with `purpose = "GCE_FIREWALL"` so the tag can be used in hierarchical firewall policies. This does not force firewall use &mdash; the tag also works for standard IAM Conditions, billing labels, and org-policy conditions.
 
-## Cross-references
+## Reference catalog (default)
 
-- [../../docs/architecture.md](../../docs/architecture.md) &mdash; section "`60-tags` (planned v0.3.0)".
-- [../../docs/contract.md](../../docs/contract.md) &mdash; planned outputs.
+| Tag key | Purpose | Reference values |
+|---|---|---|
+| `environment` | Deployment environment. Governs org-policy strength, retention, backup frequency, on-call routing. | `prod`, `preprod`, `dev` |
+| `data-classification` | Data sensitivity. Governs encryption, retention, access, cross-region replication. | `public`, `internal`, `confidential`, `restricted` |
+| `cost-center` | Cost attribution rollup. Free-form values (populate per customer's finance taxonomy). | &mdash; |
+| `owner` | Owning team / BU. Free-form values. | &mdash; |
+
+Values match the portfolio's folder tree conventions (env values map to `PRO/PRE/DEV` folder names, lowercased per GCP tag naming rules).
+
+## What it does NOT do
+
+- Does not bind tags to resources &mdash; that's the responsibility of whichever stack owns the resource. This stack only provisions the taxonomy.
+- Does not create IAM Conditions or org-policy conditions that reference tags &mdash; example patterns are documented but not enforced here.
+- Does not create billing labels &mdash; billing labels are separate from tags in GCP. Cost attribution via tags requires enabling detailed billing export + a mapping in BigQuery, which is downstream tooling.
+
+## Inputs
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `org_baseline_state_bucket` | Yes | &mdash; | Remote state for `00-org-baseline`. |
+| `enable_tags` | No | `false` | Master switch (opt-in). |
+| `create_reference_tag_set` | No | `true` | Provision the reference catalog when the stack is enabled. |
+| `reference_environment_values` | No | `["prod", "preprod", "dev"]` | Values for `environment` key. |
+| `reference_data_classification_values` | No | `["public", "internal", "confidential", "restricted"]` | Values for `data-classification` key. |
+| `enable_cost_center_tag` | No | `true` | Whether to provision the `cost-center` key. |
+| `enable_owner_tag` | No | `true` | Whether to provision the `owner` key. |
+| `custom_tag_keys` | No | `{}` | Additional tag keys outside the reference set. |
+
+Full spec in [`variables.tf`](variables.tf).
+
+## Outputs
+
+| Output | Type | Purpose |
+|---|---|---|
+| `tag_keys` | `map(string)` | Key name &rarr; `"tagKeys/<numeric_id>"`. |
+| `tag_key_ids_numeric` | `map(string)` | Key name &rarr; numeric ID only. Convenience. |
+| `tag_values` | `map(string)` | `"key/value"` &rarr; `"tagValues/<numeric_id>"`. |
+| `tag_catalog` | `map(list(string))` | Key name &rarr; list of allowed values. Human-readable summary. |
+
+Full contract in [`../../docs/contract.md`](../../docs/contract.md).
+
+## Required IAM
+
+- `roles/resourcemanager.tagAdmin` at the Organization scope.
+
+## Apply
+
+```bash
+terraform -chdir=stacks/60-tags init
+terraform -chdir=stacks/60-tags plan
+terraform -chdir=stacks/60-tags apply
+```
+
+## Downstream usage example
+
+Bind a tag value to a project (typically from that project's own Terraform stack, not from this one):
+
+```hcl
+data "terraform_remote_state" "tags" {
+  backend = "gcs"
+  config = {
+    bucket = var.org_state_bucket
+    prefix = "gcp-org-hierarchy/60-tags"
+  }
+}
+
+resource "google_tags_tag_binding" "project_env_prod" {
+  parent    = "//cloudresourcemanager.googleapis.com/projects/${google_project.workload.number}"
+  tag_value = data.terraform_remote_state.tags.outputs.tag_values["environment/prod"]
+}
+```
+
+Use the tag in an IAM Condition on a role binding:
+
+```hcl
+resource "google_project_iam_member" "prod_admin_via_tag" {
+  project = google_project.workload.project_id
+  role    = "roles/editor"
+  member  = "group:prod-admins@example.com"
+  condition {
+    title       = "Only in prod"
+    description = "Role active only when project has environment=prod tag"
+    expression  = "resource.matchTag(\"${var.org_id}/environment\", \"prod\")"
+  }
+}
+```
+
+## Failure modes
+
+- **Removing a tag value from `reference_*_values` while resources still reference it**: `google_tags_tag_value` destroy fails because bindings exist. Recovery: remove the bindings first (in the resource-owning stacks), then re-apply this stack.
+- **Naming collisions with existing tag keys**: `google_tags_tag_key` requires uniqueness per parent scope (Org). Common when someone created a tag via console before this stack existed. Recovery: either delete the console-created tag (loses history) or rename via `custom_tag_keys` to avoid collision.
+- **Value validation failure**: tag value short_names must be lowercase alphanumeric with `-` or `_`. Precondition catches this at plan time.
+- **`terraform destroy`**: removes all tag keys / values. Any resource binding is orphaned and IAM Conditions / org policies referencing the tags fail. Coordinate destroy with a full inventory of tag consumers.

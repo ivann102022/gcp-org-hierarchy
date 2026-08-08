@@ -1,0 +1,77 @@
+###############################################################################
+# File:        stacks/50-org-iam/terraform.tfvars.example
+# Author:      Ismael Cruz
+# Version:     0.1.0
+# Description: Example tfvars for the org-iam stack.
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# REQUIRED — remote-state pointer.
+# -----------------------------------------------------------------------------
+
+org_baseline_state_bucket = "REPLACE-ME-tfstate-bucket"
+
+# -----------------------------------------------------------------------------
+# REQUIRED — flip the master switch.
+# -----------------------------------------------------------------------------
+
+enable_org_iam = true
+
+# -----------------------------------------------------------------------------
+# Curated role bindings. Prefer groups over users for humans.
+# Format: 'user:<email>' / 'group:<email>' / 'serviceAccount:<email>' / 'domain:<name>'
+# -----------------------------------------------------------------------------
+
+# org_admins = [
+#   "group:platform-admins@example.com",
+# ]
+
+# project_creators = [
+#   "serviceAccount:tf-tier0@gcp0-prj-emp-ptfstate-01.iam.gserviceaccount.com",
+# ]
+
+# billing_admins = [
+#   "group:finance-cloud-admin@example.com",
+# ]
+
+# security_admins = [
+#   "group:secops@example.com",
+# ]
+
+# logging_admins = [
+#   "serviceAccount:tf-tier0@gcp0-prj-emp-ptfstate-01.iam.gserviceaccount.com",
+#   "group:observability-team@example.com",
+# ]
+
+# orgpolicy_admins = [
+#   "serviceAccount:tf-tier0@gcp0-prj-emp-ptfstate-01.iam.gserviceaccount.com",
+# ]
+
+# org_viewers = [
+#   "group:auditors@example.com",
+#   "group:oncall-engineers@example.com",
+# ]
+
+# -----------------------------------------------------------------------------
+# Break-glass — a dedicated group whose membership is EMPTY by default.
+# Populate the group (via Cloud Identity / Workspace admin) only during a
+# real emergency, with a ticket / Slack trail. gcp-observability-baseline's
+# curated alerts include a log-based alert that fires on any action performed
+# by a principal in break_glass_principals (via the log filter
+# 'protoPayload.authenticationInfo.principalEmail = ...').
+# -----------------------------------------------------------------------------
+
+# break_glass_principals = [
+#   "group:break-glass@example.com",
+# ]
+
+# -----------------------------------------------------------------------------
+# Custom bindings — for org-scope roles outside the curated set.
+# -----------------------------------------------------------------------------
+
+# custom_org_iam_bindings = {
+#   scc_admin = {
+#     role    = "roles/securitycenter.admin"
+#     members = ["group:secops-scc@example.com"]
+#   }
+# }

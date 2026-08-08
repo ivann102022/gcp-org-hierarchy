@@ -29,19 +29,47 @@ Each output is emitted by a specific stack. Consumers read from that specific st
 | `platform_project_ids` | `map(string)` | `20-projects` | Logical role &rarr; project ID. Reference keys: `plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox` &mdash; aligned with the existing GCP LZs' `existing_project_ids` map. |
 | `platform_project_numbers` | `map(string)` | `20-projects` | Logical role &rarr; project number (string form). Same keys as `platform_project_ids`. Needed for some IAM bindings that require project number rather than ID. |
 
-## Optional outputs (planned)
+## Optional outputs (shipped in v0.4.0)
 
-Emitted only when the corresponding stack is enabled and shipped. Consumers should use `try()`:
+Emitted only when the corresponding stack is enabled. Consumers should use `try()`:
 
-| Output | Type | Emitted by | Ships in | Meaning |
-|---|---|---|---|---|
-| `org_policy_ids` | `map(string)` | `30-org-policies` | v0.2.0 | Constraint name &rarr; policy resource ID. |
-| `org_policy_dry_run` | `map(bool)` | `30-org-policies` | v0.2.0 | Constraint name &rarr; whether dry-run is on. Consumers can gate audit checks on this. |
-| `log_sink_writer_identity` | `string` | `40-org-logging` | v0.2.0 | Service account identity of the org sink. Consumed by `gcp-observability-baseline` when it grants log destination access. |
-| `log_sink_destination` | `string` | `40-org-logging` | v0.2.0 | Full destination reference (e.g. `"logging.googleapis.com/projects/gcp0-prj-emp-plogs-01/locations/global/buckets/_Default"`). |
-| `org_iam_role_bindings` | `map(list(string))` | `50-org-iam` | v0.3.0 | Role &rarr; list of principals. Consumers can enforce presence of specific bindings. |
-| `tag_keys` | `map(string)` | `60-tags` | v0.3.0 | Tag key display name &rarr; ID (`"tagKeys/123"`). |
-| `tag_values` | `map(string)` | `60-tags` | v0.3.0 | `"<key>/<value>"` &rarr; ID (`"tagValues/456"`). |
+### From `30-org-policies`
+
+| Output | Type | Meaning |
+|---|---|---|
+| `org_policy_ids` | `map(string)` | Catalog key &rarr; policy resource name. |
+| `org_policy_constraints` | `map(string)` | Catalog key &rarr; GCP constraint ID (e.g. `"iam.disableServiceAccountKeyCreation"`). |
+| `org_policy_dry_run` | `map(bool)` | Catalog key &rarr; whether currently in dry-run (audit only) vs enforced. Consumers use this to filter which policies are actually blocking. |
+| `custom_org_policy_ids` | `map(string)` | Custom policy name &rarr; resource name. |
+
+### From `40-org-logging`
+
+| Output | Type | Meaning |
+|---|---|---|
+| `log_sink_id` | `string` | Sink resource name (`organizations/<org_id>/sinks/<name>`). |
+| `log_sink_name` | `string` | Bare sink name. |
+| `log_sink_writer_identity` | `string` | `"serviceAccount:..."` &mdash; consumed by `gcp-observability-baseline` and any custom pipeline that needs to grant the sink write access to downstream destinations. |
+| `log_sink_destination` | `string` | Full destination string. |
+| `log_sink_include_children` | `bool` | Whether the sink captures every project in every folder. |
+| `log_sink_filter` | `string` | Filter applied to the sink. |
+
+### From `50-org-iam`
+
+| Output | Type | Meaning |
+|---|---|---|
+| `org_iam_bindings` | `map(list(string))` | Role &rarr; list of members bound at Org scope. Consumed by audit tools. |
+| `custom_org_iam_bindings` | `map(object)` | Echo of custom bindings. |
+| `break_glass_configured` | `bool` | Whether `break_glass_principals` is non-empty. Consumed by `gcp-observability-baseline` alert-policy precondition. |
+| `break_glass_principals` | `list(string)` | Echo of break-glass principals. Consumed by obs-baseline alert filter (log-based alert on `protoPayload.authenticationInfo.principalEmail` matching). |
+
+### From `60-tags`
+
+| Output | Type | Meaning |
+|---|---|---|
+| `tag_keys` | `map(string)` | Tag key short_name &rarr; `"tagKeys/<numeric_id>"`. |
+| `tag_key_ids_numeric` | `map(string)` | Tag key short_name &rarr; numeric ID only. Convenience. |
+| `tag_values` | `map(string)` | `"<key>/<value>"` &rarr; `"tagValues/<numeric_id>"`. |
+| `tag_catalog` | `map(list(string))` | Key name &rarr; list of allowed values. Human-readable summary. |
 
 ## Consumer usage pattern
 

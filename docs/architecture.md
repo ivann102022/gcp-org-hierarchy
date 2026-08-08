@@ -197,33 +197,44 @@ The two modes produce the **same output shape** (see [contract.md](contract.md))
 - **Modes**: `create` provisions; `existing` reads by project ID.
 - **State migration from v0.1.0**: shipped via `moved` blocks in [`main.tf`](../stacks/20-projects/main.tf); folder reparent is an in-place `google_project.folder_id` update, no recreation.
 
-### `30-org-policies` (planned v0.3.0)
+### `30-org-policies`
 
-- **Owns**: `google_org_policy_policy` at Org scope, curated catalogue with per-policy `enable_X` switches.
-- **All policies default to `dry_run = true`** &mdash; surfaces violations in the audit log without blocking. Consumers flip to enforce individually after review.
+- **Owns**: `google_org_policy_policy` at Org scope, curated catalog of 8 policies with per-policy `enable_X` switches.
+- **All policies default to `dry_run = true`** &mdash; surfaces violations in the audit log without blocking. Operator flips individual policies to enforce via `enforce_overrides` after validation.
+- **Catalog**: `disable_sa_keys`, `require_oslogin`, `deny_external_ip`, `prevent_public_storage`, `restrict_sql_public_ip`, `allowed_policy_member_domains`, `trusted_image_projects`, `resource_locations`. Additional constraints via `custom_org_policies`.
+- Full rationale in [ADR-0011](adr/0011-curated-org-policy-catalog.md).
 
-### `40-org-logging` (planned v0.3.0)
+### `40-org-logging`
 
-- **Owns**: `google_logging_organization_sink` at Org scope, IAM binding on `plogs` for the sink's writer identity.
-- **Downstream**: `gcp-observability-baseline` consumes `log_sink_writer_identity` and grants the sink write access on its central log bucket. Baseline is designed as a deferred integration &mdash; today (Tier 0 pre-v0.3.0) the baseline runs project-scoped; when this stack ships, the operator wires the writer identity into `var.org_sink_writer_identity` on the baseline.
+- **Owns**: `google_logging_organization_sink` at Org scope (with `include_children = true` by default so every project in every folder is captured); `google_project_iam_member` granting the sink's writer identity `roles/logging.bucketWriter` on `plogs`.
+- **Filter default `""`** (all logs); override for cost management. **Destination default `plogs`/`_Default` log bucket**; override to custom bucket from `gcp-observability-baseline/00-log-storage` once that is applied.
+- **Downstream**: `gcp-observability-baseline` consumes `log_sink_writer_identity` and destination. Obs-baseline's deferred-integration hook (created before this stack existed) is superseded by this stack's binding &mdash; recommended migration: set `org_sink_writer_identity = ""` in obs-baseline tfvars.
+- Full rationale in [ADR-0003](adr/0003-org-sink-in-tier0-not-obs-baseline.md) (why here) and [ADR-0012](adr/0012-org-sink-design.md) (design choices).
 
-### `50-org-iam` (planned v0.4.0)
+### `50-org-iam`
 
-- **Owns**: `google_organization_iam_member` for a curated set of org-scope roles (Org Admin, Project Creator, Billing Admin, Security Admin, break-glass user).
+- **Owns**: `google_organization_iam_member` for a curated set of org-scope roles: Org Admin, Project Creator, Billing Admin, Security Admin, Logging Admin, Org Policy Admin, Org Viewer, and a dedicated **break-glass** binding separated from `org_admins` for alerting granularity.
+- Uses `google_organization_iam_member` (per-member) rather than `google_organization_iam_binding` (authoritative per-role) to avoid stomping on bindings created outside Terraform.
 - **Excludes** Workforce Identity Federation (see [ADR-0004](adr/0004-no-workforce-identity-federation-here.md)) and identity-baseline's custom roles.
+- Break-glass model in [ADR-0013](adr/0013-break-glass-user-model.md).
 
-### `60-tags` (planned v0.4.0)
+### `60-tags`
 
-- **Opt-in** (`create_tags = false` default).
-- **Owns**: `google_tags_tag_key` + `google_tags_tag_value` at Org scope for cross-tier governance.
+- **Opt-in** (`enable_tags = false` default) because tagging introduces ongoing operational cost only worth it when downstream consumers actually bind tags.
+- **Owns**: `google_tags_tag_key` + `google_tags_tag_value` at Org scope with `purpose = "GCE_FIREWALL"` for maximum consumer compatibility.
+- **Reference catalog**: `environment`, `data-classification`, `cost-center` (opt-in), `owner` (opt-in). Additional keys via `custom_tag_keys`.
+- Values for `environment` match the folder tree naming (lowercased for GCP tag validation): `prod`, `preprod`, `dev`.
+- Full rationale in [ADR-0014](adr/0014-tag-catalog-choice.md).
 
 ## Apply order
 
 Within this repo:
 
 ```
-00-org-baseline → 10-folders → 20-projects → (30 → 40 once shipped) → (50 → 60 once shipped)
+00-org-baseline → 10-folders → 20-projects → 30-org-policies → 40-org-logging → 50-org-iam → 60-tags
 ```
+
+All seven stacks shipped as of v0.4.0. Stacks 30/40/50/60 are independently applyable; the order above reflects dependency direction (30 and 60 only need `00-org-baseline`; 40 needs `20-projects` for the plogs project; 50 only needs `00-org-baseline`).
 
 Downstream (Tier 1 baselines + Tier 2 LZs) consumes Tier 0 via `terraform_remote_state`. Both wait for Tier 0 to be applied at least through `20-projects` (that's where `platform_project_ids` becomes available).
 

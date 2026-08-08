@@ -55,6 +55,37 @@ Concretely, three properties emerge from the 1:1 mapping that any of the alterna
 
 None of these properties are novel &mdash; they are the standard operational benefits of hierarchy-based IAM. The 1:1 shape is what materialises them for the platform tier of my portfolio.
 
+## Why a folder for a single project is not redundant
+
+The obvious counter-argument to the 1:1 pattern is *"why put `plogs` inside a `Logs` folder if `Logs` only contains one project?"* &mdash; it looks like unnecessary indirection.
+
+The answer is that **the folder and the project serve different purposes**, even when they map 1:1 today:
+
+- The **project** is the resource container (VMs, buckets, IAM on those resources, quotas, billing linkage).
+- The **folder** is the policy / IAM boundary (org-policy attach point, delegated administration scope, audit boundary).
+
+Keeping them separate means the boundary decision does not depend on the container decision. Today the mapping is:
+
+```
+Logs                    ← policy / IAM boundary
+└── plogs               ← resource container
+```
+
+Tomorrow the same customer might grow into:
+
+```
+Logs                    ← same policy / IAM boundary
+├── plogs               ← centralized log destination
+├── archive-logs        ← long-term archival with different retention
+└── forensic-logs       ← incident-only bucket with Object Lock
+```
+
+The IAM delegation to the observability team stays at the `Logs` folder. The org policy that forbids external IPs stays at the `Logs` folder. **Nothing about the boundary changes** when the container structure evolves.
+
+Without the folder, growing from one to three log projects would require re-scoping every IAM binding and every org policy attach point. With the folder, growth is a pure additive change inside the boundary.
+
+I am not saying every customer needs three log projects. I am saying the 1:1 shape does not prejudge the growth path &mdash; and that is why the "folder for a single project" is architecturally cheap and operationally future-proof.
+
 ## Consequences
 
 **Positive**:

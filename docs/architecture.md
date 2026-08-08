@@ -104,7 +104,7 @@ Organization (emp.com)
 Design decisions embedded in this shape:
 
 - **`Platform` has one folder per platform project (1:1)** &mdash; not grouped by discipline. Enables granular IAM scoping (`roles/dns.admin` on `DNS` folder applies only to `pdns`), per-folder org policies, and clean audit surfaces. See [ADR-0005](adr/0005-folder-per-platform-project.md).
-- **`LandingZones` has three second-level children** &mdash; `HUB` (flat) plus `HostPrj` and `ServicePrj` (both env-split). Encodes the Shared VPC host-vs-service lifecycle split at the folder level. See [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md).
+- **`LandingZones` has three second-level children** &mdash; `HUB` (flat) plus `HostPrj` and `ServicePrj` (both env-split). The split encodes three concurrent dimensions at the folder level: **ownership** (Network+Security teams operate HostPrj; Systems+Applications teams operate ServicePrj), **policy inheritance** (network guardrails inherited on HostPrj, workload guardrails on ServicePrj), and **lifecycle** (Shared VPC changes rarely, workloads constantly). Function/ownership is deliberately the first frontier under `LandingZones`; environment (PRO/PRE/DEV) is the second. See [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md).
 - **`Sandbox` stays flat** &mdash; a single sandbox project by default; expand with `custom_folders` if per-team sandboxes are needed.
 
 Depth-3 grandchildren under `HostPrj` and `ServicePrj` use composite keys (`HostPrj-PRO`, `ServicePrj-DEV`, ...) in Terraform's flat map because display-name uniqueness in GCP is per-parent, not global (see [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md#composite-keys)).

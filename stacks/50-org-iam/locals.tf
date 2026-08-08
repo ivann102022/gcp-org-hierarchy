@@ -17,7 +17,6 @@ locals {
   curated_role_members = {
     "roles/resourcemanager.organizationAdmin"  = concat(var.org_admins, var.break_glass_principals)
     "roles/resourcemanager.projectCreator"      = var.project_creators
-    "roles/billing.admin"                       = var.billing_admins
     "roles/iam.securityAdmin"                   = var.security_admins
     "roles/logging.admin"                       = var.logging_admins
     "roles/orgpolicy.policyAdmin"               = var.orgpolicy_admins

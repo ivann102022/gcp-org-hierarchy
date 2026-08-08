@@ -30,9 +30,13 @@ enable_org_iam = true
 #   "serviceAccount:tf-tier0@gcp0-prj-emp-ptfstate-01.iam.gserviceaccount.com",
 # ]
 
-# billing_admins = [
-#   "group:finance-cloud-admin@example.com",
-# ]
+# Note: billing IAM is deliberately not managed by this stack. `roles/billing.admin`
+# has lowest-level grantable resource = Billing Account (not Organization), and
+# `roles/billing.creator` is org-scope but only useful when creating new Billing
+# Accounts (uncommon in a portfolio deployment where the Billing Account pre-exists).
+# When a concrete requirement appears, a dedicated `55-billing-iam` stack or
+# subsection will be added using `google_billing_account_iam_member` for account-
+# scope admin, or `roles/billing.creator` via this stack for org-scope creation.
 
 # security_admins = [
 #   "group:secops@example.com",

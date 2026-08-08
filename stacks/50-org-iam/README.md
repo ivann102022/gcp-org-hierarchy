@@ -23,7 +23,6 @@ Break-glass model documented in [ADR-0013](../../docs/adr/0013-break-glass-user-
 |---|---|---|
 | `org_admins` | `roles/resourcemanager.organizationAdmin` | Small platform-admin group. Most privileged role in GCP &mdash; treat with matching operational discipline. |
 | `project_creators` | `roles/resourcemanager.projectCreator` | Terraform SA(s) that run Tier 0 stack `20-projects` + any LZ that has `create_projects = true` fallback. |
-| `billing_admins` | `roles/billing.admin` | ⚠️ **Under review** &mdash; see [docs/pending-corrections.md](../../docs/pending-corrections.md). `roles/billing.admin` has lowest-level grantable resource = Billing Account (not Organization); binding it at Org scope with `google_organization_iam_member` does not match the role's intended scope. Fix direction: use `roles/billing.creator` for Org-scope billing account creation, or migrate to a dedicated `google_billing_account_iam_member` for administering a specific Billing Account. |
 | `security_admins` | `roles/iam.securityAdmin` | SecOps team. Grants ability to modify IAM policies org-wide. |
 | `logging_admins` | `roles/logging.admin` | Terraform SA for `40-org-logging` + observability team. |
 | `orgpolicy_admins` | `roles/orgpolicy.policyAdmin` | Terraform SA for `30-org-policies`. |

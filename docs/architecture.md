@@ -235,7 +235,7 @@ The two modes produce the **same output shape** (see [contract.md](contract.md))
 
 ### `50-org-iam`
 
-- **Owns**: `google_organization_iam_member` for a curated set of org-scope roles: Org Admin, Project Creator, Billing Admin, Security Admin, Logging Admin, Org Policy Admin, Org Viewer, and a dedicated **break-glass** binding separated from `org_admins` for alerting granularity.
+- **Owns**: `google_organization_iam_member` for a curated set of org-scope roles: Org Admin, Project Creator, Security Admin, Logging Admin, Org Policy Admin, Org Viewer, and a dedicated **break-glass** binding separated from `org_admins` for alerting granularity. Billing IAM is deliberately out of scope of this stack (see [pending-corrections.md](security/../pending-corrections.md) for context; billing IAM will land in a dedicated stack or subsection when a concrete requirement appears).
 - Uses `google_organization_iam_member` (per-member) rather than `google_organization_iam_binding` (authoritative per-role) to avoid stomping on bindings created outside Terraform.
 - **Excludes** Workforce Identity Federation (see [ADR-0004](adr/0004-no-workforce-identity-federation-here.md)) and identity-baseline's custom roles.
 - Break-glass model in [ADR-0013](adr/0013-break-glass-user-model.md).

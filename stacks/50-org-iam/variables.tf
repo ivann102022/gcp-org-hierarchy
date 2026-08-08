@@ -59,12 +59,6 @@ variable "project_creators" {
   default     = []
 }
 
-variable "billing_admins" {
-  description = "Principals granted roles/billing.admin at Org scope. Sensitive role — restrict to a small group (finance-approved)."
-  type        = list(string)
-  default     = []
-}
-
 variable "security_admins" {
   description = "Principals granted roles/iam.securityAdmin at Org scope. Grants ability to modify IAM policies org-wide. Typically SecOps team."
   type        = list(string)

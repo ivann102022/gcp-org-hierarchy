@@ -27,12 +27,17 @@ enable_org_sink = true
 # sink_name  = "central"    # → resource name: gcp0-orgsink-central-01
 
 # -----------------------------------------------------------------------------
-# OPTIONAL — sink filter. Default "" (all logs). Common cost-control overrides:
+# OPTIONAL — sink filter. Default "" (all logs). PREFER exclusion-based cost
+# control (see `exclusions` block below) over severity filtering at the sink
+# level — severity is not a proxy for security-audit value; many audit events
+# land below WARNING. If you do restrict, do it by log class, not by severity:
 # -----------------------------------------------------------------------------
 
-# sink_filter = "severity>=WARNING"
 # sink_filter = "resource.type=\"gce_instance\" OR resource.type=\"k8s_cluster\""
 # sink_filter = "protoPayload.serviceName!=\"loadbalancing.googleapis.com\""
+
+# Not recommended for a security-oriented org sink:
+# sink_filter = "severity>=WARNING"    # drops INFO-level audit events
 
 # -----------------------------------------------------------------------------
 # OPTIONAL — sink scope. Almost always keep include_children = true.

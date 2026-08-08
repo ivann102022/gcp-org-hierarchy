@@ -14,7 +14,7 @@ Full rationale for placing the sink in Tier 0 (rather than in `gcp-observability
 
 ## What it owns
 
-- `google_logging_organization_sink.org` &mdash; the sink itself. `include_children = true` by default (captures every project in every folder). `unique_writer_identity = true` so GCP mints a dedicated writer SA per sink (audit clarity).
+- `google_logging_organization_sink.org` &mdash; the sink itself. `include_children = true` by default (captures every project in every folder). The sink is **non-intercepting** (the stack does not set `intercept_children`) &mdash; individual project sinks continue to route logs locally as before, while this sink additionally aggregates them centrally. The writer identity model relies on the current Cloud Logging default behaviour for org sinks; see [docs/pending-corrections.md](../../docs/pending-corrections.md) for the audit of an explicit `unique_writer_identity` attribute vs the provider/API default.
 - `google_project_iam_member.writer_identity` &mdash; grants the sink's writer SA `roles/logging.bucketWriter` on the `plogs` project when `destination_type = "log_bucket"` and `create_writer_identity_binding = true` (default).
 
 ## What it does NOT do
@@ -41,11 +41,11 @@ Once this stack ships (v0.4.0 of Tier 0), two options for the transition:
 | `enable_org_sink` | No | `false` | Master switch. |
 | `create_writer_identity_binding` | No | `true` | Whether this stack owns the IAM binding on plogs. |
 | `sink_name` | No | `"central"` | Short name segment for the sink resource. |
-| `sink_filter` | No | `""` (all logs) | Cloud Logging filter. Common override: `severity>=WARNING` for cost. |
+| `sink_filter` | No | `""` (all logs) | Cloud Logging filter. Prefer exclusion-based cost control (see `exclusions` below) over severity filtering &mdash; severity is not a proxy for security-audit value (many security-relevant audit events land below WARNING). |
 | `include_children` | No | `true` | Capture every project in every folder. Almost always true. |
 | `disabled` | No | `false` | Pause/resume without deleting the sink. |
 | `destination_type` | No | `"log_bucket"` | `log_bucket` / `bigquery` / `pubsub` / `storage`. |
-| `destination_log_bucket` | Required if `log_bucket` | `"_Default"` | Bucket in plogs. Override to custom bucket from obs-baseline. |
+| `destination_log_bucket` | Required if `log_bucket` | `"_Default"` | Bucket in plogs. `_Default` is a **bootstrap fallback** so this stack can be applied before `gcp-observability-baseline/00-log-storage` provisions a custom log bucket. The **target architecture** is to override this value to the custom central log bucket created by obs-baseline &mdash; that bucket has configured retention, CMEK, Log Analytics upgrade, etc., which `_Default` cannot provide. |
 | `destination_log_bucket_location` | No | `"global"` | Bucket location. |
 | `destination_override` | Required for non-log_bucket | `""` | Full destination string for BQ/PubSub/GCS. |
 | `exclusions` | No | `{}` | Sink-level exclusions (filter before export). |

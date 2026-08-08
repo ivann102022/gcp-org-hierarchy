@@ -29,15 +29,37 @@ Each answer is small, but the combination determines whether the org sink is a g
 The sink filter defaults to empty string (no filter &mdash; every log entry from every project in the Org is exported).
 
 - **Rationale for empty default**: an org sink is designed to be the reliable central capture. Filtering at the sink is filtering **out** &mdash; anything filtered out never reaches `plogs` and cannot be queried later. For a first deployment I would rather have too many logs than realise mid-incident that the log I need was filtered out.
-- **Cost management overrides**: `severity>=WARNING` for cost-sensitive tenants; specific resource-type filters (`resource.type="gce_instance" OR ...`) for use-case-specific captures; exclusions for very-high-volume-low-value logs (LB health checks) via `var.exclusions` (which preserves the logs in each project's own bucket but drops them from the org sink).
+- **Cost management overrides**: prefer exclusion-based control (`var.exclusions`) over severity filtering. Severity is not a proxy for security-audit value &mdash; many security-relevant audit events (IAM changes, admin actions, SetIamPolicy calls) land at INFO or NOTICE severity, and a `severity>=WARNING` filter silently drops them. Use exclusions targeted at validated log classes (LB health checks, container liveness probes, well-known high-volume-low-value log names) rather than blanket severity thresholds. Resource-type filters (`resource.type="gce_instance" OR ...`) are also acceptable for use-case-specific captures.
 
-### Destination: default `plogs` `_Default` log bucket, override to custom bucket.
+### Destination: `_Default` bucket as bootstrap fallback; custom bucket as target architecture.
 
-`destination_type = "log_bucket"` default; `destination_log_bucket = "_Default"` default; `destination_log_bucket_location = "global"` default.
+`destination_type = "log_bucket"` default; `destination_log_bucket = "_Default"` default (**bootstrap**); `destination_log_bucket_location = "global"` default.
 
-- **Rationale for `_Default`**: it always exists in every project (Google-managed). Zero prerequisite &mdash; the sink can be applied even before `gcp-observability-baseline` provisions the custom log bucket.
-- **Override to custom bucket**: after obs-baseline's `00-log-storage` provisions the custom log bucket (`gcp0-log-bucket-default-01`), operators override `destination_log_bucket` to route logs there. That gives them retention control, KMS encryption, Log Analytics upgrade, etc. &mdash; capabilities `_Default` lacks.
-- **Non-log-bucket destinations** (BigQuery, Pub/Sub, GCS) are supported via `destination_type` + `destination_override` but are rare at the org sink level. Prefer per-destination sinks in `gcp-observability-baseline/10-log-exports` (which own their destinations) over doing everything at the org sink.
+**Important distinction &mdash; bootstrap fallback vs target architecture:**
+
+- **Bootstrap fallback (`_Default`)**: the default value exists so this stack can be applied before `gcp-observability-baseline/00-log-storage` provisions a custom log bucket. The `_Default` bucket always exists in every project (Google-managed, 30-day retention, no CMEK, no Log Analytics upgrade). Zero prerequisite. Useful for greenfield bootstrap where the operator wants org sink capability immediately.
+- **Target architecture (custom bucket)**: the intended long-term destination. Once obs-baseline's `00-log-storage` provisions the custom log bucket (`gcp0-log-bucket-default-01` by default), operators override `destination_log_bucket` to route there. Custom bucket has configured retention, CMEK, Log Analytics upgrade, exclusions catalog &mdash; capabilities `_Default` lacks. A deployment that stays on `_Default` past bootstrap is under-configured; it will fail an audit requiring retention beyond 30 days or encryption with a customer-managed key.
+
+The default in Terraform does not prejudge which one applies to a given deployment. The operator makes the informed choice based on whether obs-baseline is applied yet. Documentation and this ADR treat custom bucket as target; `_Default` is the safe starting point.
+
+**Non-log-bucket destinations** (BigQuery, Pub/Sub, GCS) are supported via `destination_type` + `destination_override` but are rare at the org sink level. Prefer per-destination sinks in `gcp-observability-baseline/10-log-exports` (which own their destinations) over doing everything at the org sink.
+
+### Non-intercepting sink by default.
+
+The stack does **not** set `intercept_children` on the sink. This is a deliberate choice, not an omission.
+
+Two modes exist in GCP for aggregated org sinks:
+
+- **Non-intercepting** (this stack's model): logs continue to be processed by their own project's `_Default` sink and by any other project- or folder-scoped sinks. This aggregated sink **additionally** captures them and routes centrally.
+- **Intercepting** (via `intercept_children = true`): this sink pre-empts descendant sinks for the matching log classes. Descendant sinks that would otherwise receive those logs do not process them.
+
+I chose non-intercepting because:
+
+- **Central visibility does not need to break local project logging**. Workload teams often rely on the project's own log bucket for day-to-day operations; intercepting would silently remove that visibility.
+- **The org sink is a copy-and-route control, not a policy control**. Making it authoritative over what descendant sinks can see would blur its role from "aggregation" to "enforcement".
+- **Least surprise**: an operator who enables this stack is unlikely to expect that project-level logging behaviour changes as a side effect. Intercepting would produce exactly that side effect.
+
+If an operator has a specific need for interception (e.g. compliance-scoped isolated logs that must not appear in workload team buckets), that's a `custom_sinks` variant in a future release &mdash; not the default behaviour of the central sink.
 
 ### `include_children = true` default.
 
@@ -108,6 +130,7 @@ Language convention: "supports controls typically found in ..." not "complies wi
 - Multiple sinks (via `custom_sinks` addition to variables) so per-team / per-compliance-scope logs route to distinct destinations. Example: PCI-scoped audit logs to a dedicated PCI bucket with 10-year retention; general logs to standard bucket with 30-day.
 - Sink-level exclusions catalog for known high-volume-low-value log names (LB probes, container liveness checks). Reduce cost without losing signal at the project level.
 - Route directly to BigQuery for near-real-time analytics on the audit stream.
+- **Least-privilege on the writer-identity IAM binding**: scope the current project-level `roles/logging.bucketWriter` grant to the specific destination log bucket &mdash; via IAM Conditions restricting `resource.name` to the bucket path, or via bucket-level IAM if / when GCP surfaces it. The current project-scope grant is functionally correct but grants the writer SA the ability to write to any log bucket in `plogs`, not just the one this sink targets. Bucket-scoped is the least-privilege posture.
 
 **High-isolation option**:
 - Dedicated org sinks per compliance regime (`sink_pci`, `sink_gdpr`, `sink_regulated`) each routing to isolated destination projects with distinct IAM. Downstream analytics never crosses compliance boundaries.

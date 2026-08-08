@@ -69,6 +69,25 @@ Portfolio-quality signal: a rigorous review of shipped code always finds items. 
 
 ---
 
+## From section 40 review (org-logging)
+
+### ✕ Bug: `unique_writer_identity` claimed in docs, not explicit in code
+
+**Where**: [`stacks/40-org-logging/README.md`](../stacks/40-org-logging/README.md) previously claimed the resource sets `unique_writer_identity = true`. [`stacks/40-org-logging/main.tf`](../stacks/40-org-logging/main.tf) does not set the attribute; a comment above the resource block mentions the intent but the resource itself does not include the argument. The README has been softened in v0.4.10 to remove the explicit claim and point at this correction item.
+
+**Why it matters**:
+- Documentation asserted a behaviour the code did not explicitly guarantee.
+- The Terraform provider default for `google_logging_organization_sink.unique_writer_identity` may change between provider majors; relying on the default without pinning is fragile for a portfolio artifact.
+- Current Cloud Logging behaviour has evolved &mdash; since 2023, GCP typically uses a shared logging service account per parent resource for sinks (rather than minting a unique SA per sink), which affects the correct value to configure explicitly.
+
+**Fix direction**:
+1. Verify current provider behaviour for `google_logging_organization_sink.unique_writer_identity` (default value, deprecation status, GCP-side behaviour).
+2. Decide explicitly: unique-per-sink SA (audit clarity per sink) vs shared-per-parent SA (aligned with current GCP default). Document the choice in ADR-0012.
+3. Set the attribute explicitly in `main.tf` to match the decision, so the behaviour is not implicit / provider-default.
+4. Re-align README with the code once the attribute is explicit.
+
+Not blocking normal operation &mdash; the sink works with the provider default. But the doc/code divergence is a real correctness issue.
+
 ## Convention for using this file
 
 - Each item lands here when a review section identifies it and stays here until a code release fixes it.

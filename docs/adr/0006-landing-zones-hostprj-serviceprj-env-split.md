@@ -70,6 +70,8 @@ Without the split, all constraints attach at `LandingZones` and apply uniformly 
 
 This is a concrete instance of the general principle in [ADR-0009](0009-layered-segmentation-hierarchy-first.md): **Tier 0 folder shape causes what Tier N policy can express**. Getting `10-folders` right today is what lets `30-org-policies` express the right controls tomorrow.
 
+**GCP-specific reinforcement &mdash; Shared VPC + Hierarchical Firewall Policies inheritance**. In Shared VPC, a VM interface belongs to a Service Project but attaches to a VPC that lives in the Host Project. Google evaluates the Hierarchical Firewall Policies (HFPs) that govern that interface using the **Host Project's** folder hierarchy, not the Service Project's. Consequence: an HFP attached at `LandingZones/HostPrj` propagates to every VM interface using any of the host VPCs &mdash; PRO, PRE, DEV &mdash; regardless of which Service Project owns the VM. Attaching an HFP at `LandingZones/ServicePrj` would NOT affect VMs whose interface is in a Host Project's Shared VPC (which is most workloads in this architecture). This is a Google-native technical justification for keeping the HostPrj branch as the primary network-policy attach point &mdash; not just an organisational convenience; it's where GCP evaluates network firewall inheritance for the Shared VPC pattern.
+
 ### Reason 3 &mdash; Different lifecycle
 
 - **HostPrj** changes rarely &mdash; a new peering, a new subnet, a Shared VPC service attachment. Coordinated network change windows.

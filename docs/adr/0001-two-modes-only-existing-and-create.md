@@ -7,9 +7,11 @@ Version:     0.1.0
 # ADR-0001: Two organization modes only (`existing` / `create`), no `blueprint` or `control_tower` equivalent
 
 **Status**: Accepted
-**Date**: 2026-08-07
+**Date**: 2026-08-07 (updated 2026-08-07 for v0.2.0 anchor+baseline note)
 **Deciders**: Ismael Cruz
-**Tags**: gcp, tier-0, modes, cloud-foundation-fabric
+**Tags**: gcp, tier-0, modes, cloud-foundation-fabric, anchor-baseline
+
+> **v0.2.0 clarification (anchor + baseline)**: the `create` mode of Tier 0 refers to *folders + platform projects + org-policies + org-sink* &mdash; **never** to the Organization itself (impossible in GCP). Stack `00-org-baseline` remains an **anchor + baseline** in both modes: it publishes contract facts from the pre-existing Organization AND administers the minimum org-scope elements that don't belong to any discipline (see [ADR-0007](0007-content-rule-for-org-baseline.md) for the content rule and the [`00-org-baseline` README](../../stacks/00-org-baseline/README.md) for the pattern). The absence of a `create` path for the Organization does not make this stack passive &mdash; it is actively responsible for the anchor + baseline duties.
 
 ## Context
 

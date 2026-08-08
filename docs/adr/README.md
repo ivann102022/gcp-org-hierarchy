@@ -1,10 +1,10 @@
 <!--
 File:        docs/adr/README.md
 Author:      Ismael Cruz
-Version:     0.1.0
+Version:     0.2.0
 Description: Index of Architecture Decision Records for gcp-org-hierarchy.
-             Format: MADR-lite (Status / Context / Decision / Consequences
-             / Alternatives / References). One ADR per non-obvious decision.
+             Format: MADR-lite (Status / Context / Decision / Consequences /
+             Alternatives / References). One ADR per non-obvious decision.
 -->
 
 # Architecture Decision Records
@@ -14,13 +14,17 @@ This directory holds the ADRs for `gcp-org-hierarchy`. Each ADR documents one no
 **Format**: MADR-lite (see any existing ADR for the template).
 **Numbering**: 4-digit sequential (`0001-`, `0002-`, ...). Numbers are never reused, even if an ADR is superseded.
 **Status values**: `Proposed` &vert; `Accepted` &vert; `Superseded by ADR-XXXX` &vert; `Deprecated`.
-**When to write one**: any decision where a reader would ask "but why not the other way?" &mdash; tier boundary, mode choice, resource ownership, exclusion of an obvious feature, etc. Skip trivial conventions (naming, priorities) &mdash; those live in [`../conventions.md`](../conventions.md).
+**When to write one**: any decision where a reader would ask "but why not the other way?" &mdash; tier boundary, mode choice, resource ownership, exclusion of an obvious feature, folder shape, cross-tier interlock, etc. Skip trivial conventions (naming, priorities) &mdash; those live in [`../conventions.md`](../conventions.md).
 
 ## Index
 
 | # | Title | Status | Date |
 |---|---|---|---|
-| [0001](0001-two-modes-only-existing-and-create.md) | Two organization modes only (`existing` / `create`), no `blueprint` or `control_tower` equivalent | Accepted | 2026-08-07 |
+| [0001](0001-two-modes-only-existing-and-create.md) | Two organization modes only (`existing` / `create`), no `blueprint` or `control_tower` equivalent | Accepted (updated for v0.2.0 anchor+baseline note) | 2026-08-07 |
 | [0002](0002-platform-projects-here-not-in-lz.md) | Platform projects (`plogs` / `pmgm` / ...) are created here, not by each landing zone | Accepted | 2026-08-07 |
 | [0003](0003-org-sink-in-tier0-not-obs-baseline.md) | Organization-level log sink lives in Tier 0, not in the observability baseline | Accepted | 2026-08-07 |
 | [0004](0004-no-workforce-identity-federation-here.md) | Workforce Identity Federation is not in Tier 0 &mdash; it belongs in the identity baseline | Accepted | 2026-08-07 |
+| [0005](0005-folder-per-platform-project.md) | One folder per platform project under `Platform` (1:1) | Accepted | 2026-08-07 |
+| [0006](0006-landing-zones-hostprj-serviceprj-env-split.md) | `LandingZones` sub-tree &mdash; `HUB` flat + `HostPrj` / `ServicePrj` with environment sub-folders | Accepted | 2026-08-07 |
+| [0007](0007-content-rule-for-org-baseline.md) | Content rule for stack `00-org-baseline` &mdash; org-scope + fundacional + not-a-discipline | Accepted | 2026-08-07 |
+| [0008](0008-ingress-bypasses-perimeter-appliance.md) | Public ingress bypasses the perimeter appliance by design | Accepted | 2026-08-07 |

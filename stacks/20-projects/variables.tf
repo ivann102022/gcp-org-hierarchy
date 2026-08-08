@@ -1,12 +1,13 @@
 ###############################################################################
 # File:        stacks/20-projects/variables.tf
 # Author:      Ismael Cruz
-# Version:     0.1.0
+# Version:     0.2.0
 # Description: Inputs for the platform-projects stack. Provisions or
-#              references the six reference platform projects (plogs,
-#              pmgm, piam, pdns, pingress, sandbox) split across the
-#              Platform and Sandbox folders. Consumes the shared 'projects'
-#              module at v0.1.0.
+#              references the six reference platform projects (plogs, pmgm,
+#              piam, pdns, pingress, sandbox). v0.2.0 places each project
+#              in its 1:1 home sub-folder (Logs / Management / IAM / DNS /
+#              Ingress under Platform, Sandbox as its own root) per
+#              ADR-0005. Consumes the shared 'projects' module at v0.1.0.
 ###############################################################################
 
 # -----------------------------------------------------------------------------
@@ -158,6 +159,33 @@ variable "extra_services_by_role" {
     pdns     = ["dns.googleapis.com"]
     pingress = ["compute.googleapis.com"]
     sandbox  = []
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Role → home-folder mapping (v0.2.0). Default reproduces the reference
+# architecture diagram: each platform project lives in its 1:1 sub-folder
+# under Platform (per ADR-0005), sandbox lives directly under the Sandbox
+# root. Overriding this map is the mechanism to relocate a project — e.g.
+# collapse to the v0.1.0 flat layout by pointing every role at "Platform"
+# and setting reference_platform_children = [] on 10-folders.
+#
+# Values must be folder keys known to 10-folders' folder_ids output (either
+# a reference folder or a custom_folders entry). Unknown folder keys cause
+# fallback to the Organization root (project created at Org level, with a
+# console warning at plan time via the precondition below).
+# -----------------------------------------------------------------------------
+
+variable "platform_project_home_folder" {
+  description = "Map of role → folder key where each platform project should be placed. Default reproduces the reference architecture: 1:1 folder-per-project under Platform (Logs/Management/IAM/DNS/Ingress) + sandbox under Sandbox. Override for flat layout or custom folder placement."
+  type        = map(string)
+  default = {
+    plogs    = "Logs"
+    pmgm     = "Management"
+    piam     = "IAM"
+    pdns     = "DNS"
+    pingress = "Ingress"
+    sandbox  = "Sandbox"
   }
 }
 

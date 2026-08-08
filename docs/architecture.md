@@ -1,12 +1,13 @@
 <!--
 File:        docs/architecture.md
 Author:      Ismael Cruz
-Version:     0.1.0
+Version:     0.2.0
 Description: Architecture reference for gcp-org-hierarchy — the layered
-             repo model in GCP, why hierarchy is Tier 0, why platform
-             projects live here (not in the LZ), and per-stack design
-             rationale. Non-obvious decisions are extracted to ADRs
-             under docs/adr/.
+             repo model in GCP, why hierarchy is Tier 0, the anchor + baseline
+             framing for stack 00, the v0.2.0 folder tree (1:1 platform
+             children + HostPrj/ServicePrj env-split under LandingZones),
+             and per-stack design rationale. Non-obvious decisions are
+             extracted to ADRs under docs/adr/.
 -->
 
 # Architecture
@@ -21,7 +22,7 @@ Tier 0  ORGANIZATION HIERARCHY         ← THIS REPO
 Tier -1 Shared modules                 (shared-modules/terraform-gcp-modules)
 ```
 
-Each tier knows only the one below via a documented contract. In GCP, Tier 0 exists because Google leaves the folder tree, the project factory, and the org policies to you — they arrive empty with your Cloud Identity tenant. This is different from AWS (where Tier 0 also creates the Organization itself) and closer to Azure (where the tenant arrives but Management Groups must be designed and provisioned).
+Each tier knows only the one below via a documented contract. In GCP, Tier 0 exists because Google leaves the folder tree, the project factory, and the org policies to you &mdash; they arrive empty with your Cloud Identity tenant. This is different from AWS (where Tier 0 also creates the Organization itself) and closer to Azure (where the tenant arrives but Management Groups must be designed and provisioned).
 
 Cross-CSP contrast summarised:
 
@@ -31,9 +32,60 @@ Cross-CSP contrast summarised:
 | **GCP** | Comes with Google Workspace / Cloud Identity. **Folders are optional structure inside it, but every enterprise wants them.** |
 | **Azure** | Comes with the Entra ID tenant. Management Groups are optional structure inside it. |
 
+## Stack `00-org-baseline`: the anchor + baseline pattern
+
+The name of stack `00-org-baseline` is deliberate and encodes two active responsibilities, not one passive lookup:
+
+1. **Anchor** &mdash; establish the canonical point of reference for the portfolio to the pre-existing GCP Organization. The stack publishes `organization_id`, `organization_name`, `organization_domain`, and `billing_account_id` as **contractual facts** that every downstream stack and repo consumes via `terraform_remote_state`. Downstream never re-discovers the Org; they read this contract. That publication is active work even though the underlying `google_organization` is a data source.
+
+2. **Baseline** &mdash; provision the **minimal set of org-scope elements administered from apply #1** that do not belong to any specific discipline. Today that set is just `google_essential_contacts_contact` (security / billing / technical notifications at Org scope). It's small on purpose &mdash; see the content rule below.
+
+Same role as the AWS sibling `aws-org-hierarchy/00-org-baseline`: **anchor + baseline**. In AWS the anchor is a `create` (Organization does not exist); in GCP the anchor is a `data` (Organization pre-exists). The **conceptual responsibility is identical**; only the implementation differs because of CSP API constraints.
+
+### Content rule for stack `00-org-baseline`
+
+A candidate belongs in this stack **only if it meets all three criteria**:
+
+1. **Org-scope** &mdash; its natural scope is the Organization, not a folder or project.
+2. **Fundacional** &mdash; established at apply #1, not at apply #N.
+3. **Not a discipline** &mdash; does not fall cleanly under Policies (30), Logging (40), IAM (50), or Tags (60), *even if org-scope*.
+
+The third criterion is the guardrail. Without it, "org-scope + fundacional" alone would slowly turn `00-org-baseline` into a catch-all and erode the reason the other stacks exist. See [ADR-0007](adr/0007-content-rule-for-org-baseline.md) for the full test with worked examples.
+
+## The v0.2.0 folder tree
+
+```
+Organization (emp.com)
+├── Platform                       [root]
+│   ├── Logs                       [child]        → home of plogs
+│   ├── Management                 [child]        → home of pmgm
+│   ├── IAM                        [child]        → home of piam
+│   ├── DNS                        [child]        → home of pdns
+│   └── Ingress                    [child]        → home of pingress
+├── LandingZones                   [root]
+│   ├── HUB                        [child, flat]         → home of pnet-hub (LZ-owned)
+│   ├── HostPrj                    [child, env-split]
+│   │   ├── PRO                    [grandchild]          → home of pnet-pro (LZ-owned)
+│   │   ├── PRE                    [grandchild]          → home of pnet-pre (LZ-owned)
+│   │   └── DEV                    [grandchild]          → home of pnet-dev (LZ-owned)
+│   └── ServicePrj                 [child, env-split]
+│       ├── PRO                    [grandchild]          → home of srv-pro (LZ-owned)
+│       ├── PRE                    [grandchild]          → home of srv-pre (LZ-owned)
+│       └── DEV                    [grandchild]          → home of srv-dev (LZ-owned)
+└── Sandbox                        [root, flat]          → home of sandbox
+```
+
+Design decisions embedded in this shape:
+
+- **`Platform` has one folder per platform project (1:1)** &mdash; not grouped by discipline. Enables granular IAM scoping (`roles/dns.admin` on `DNS` folder applies only to `pdns`), per-folder org policies, and clean audit surfaces. See [ADR-0005](adr/0005-folder-per-platform-project.md).
+- **`LandingZones` has three second-level children** &mdash; `HUB` (flat) plus `HostPrj` and `ServicePrj` (both env-split). Encodes the Shared VPC host-vs-service lifecycle split at the folder level. See [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md).
+- **`Sandbox` stays flat** &mdash; a single sandbox project by default; expand with `custom_folders` if per-team sandboxes are needed.
+
+Depth-3 grandchildren under `HostPrj` and `ServicePrj` use composite keys (`HostPrj-PRO`, `ServicePrj-DEV`, ...) in Terraform's flat map because display-name uniqueness in GCP is per-parent, not global (see [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md#composite-keys)).
+
 ## Why platform projects live here, not in each LZ
 
-Superficially, the platform projects (`plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox`) could be created by whichever LZ deploys first — the GCP LZs even ship a `create_projects = true` mode for that. In practice, that pattern collapses when a second LZ appears: the two LZs either fight for ownership of the same project IDs or drift into inconsistent naming.
+Superficially, the platform projects (`plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox`) could be created by whichever LZ deploys first &mdash; the GCP LZs even ship a `create_projects = true` mode for that. In practice, that pattern collapses when a second LZ appears: the two LZs either fight for ownership of the same project IDs or drift into inconsistent naming.
 
 Making Tier 0 the sole owner:
 
@@ -46,7 +98,7 @@ Full rationale in [ADR-0002](adr/0002-platform-projects-here-not-in-lz.md).
 
 ## Why the org log sink lives here, not in observability-baseline
 
-`google_logging_organization_sink` is an **org-scope resource** — creating it requires `roles/logging.configWriter` at the Organization level. Observability-baseline is written to run inside a single project (`plogs`) with project-scope permissions. Putting the org sink in observability-baseline would force the baseline to hold org-level rights it does not otherwise need.
+`google_logging_organization_sink` is an **org-scope resource** &mdash; creating it requires `roles/logging.configWriter` at the Organization level. Observability-baseline is written to run inside a single project (`plogs`) with project-scope permissions. Putting the org sink in observability-baseline would force the baseline to hold org-level rights it does not otherwise need.
 
 Split:
 
@@ -59,11 +111,24 @@ Full rationale in [ADR-0003](adr/0003-org-sink-in-tier0-not-obs-baseline.md).
 
 WIF is often lumped into "org hierarchy" material because it's org-scope in name. It is not:
 
-- WIF pools / providers can be created at the project scope (`google_iam_workforce_pool` targets a workforce federation project — typically `piam`).
-- WIF is intimately coupled to group-based IAM patterns, custom roles, break-glass procedures — all of which are **identity discipline** (Tier 1), not hierarchy discipline (Tier 0).
+- WIF pools / providers can be created at the project scope (`google_iam_workforce_pool` targets a workforce federation project &mdash; typically `piam`).
+- WIF is intimately coupled to group-based IAM patterns, custom roles, break-glass procedures &mdash; all of which are **identity discipline** (Tier 1), not hierarchy discipline (Tier 0).
 - Coupling WIF to Tier 0 would force every hierarchy change to redeploy identity infrastructure. Wrong blast-radius alignment.
 
 Split: this repo creates `piam` (the project). `gcp-identity-baseline` provisions WIF pools, groups, custom roles, and break-glass patterns inside `piam`. Full rationale in [ADR-0004](adr/0004-no-workforce-identity-federation-here.md).
+
+## Why public ingress bypasses the perimeter appliance
+
+The Tier 2 LZ deploys a FortiGate perimeter appliance in `pnet-hub` that handles **egress** (workload-initiated outbound traffic) and **east-west** (inter-tenant, inter-environment) inspection. It does **not** sit in the path of public **ingress** traffic.
+
+Public ingress terminates at Google's edge via Global External Load Balancers + Cloud Armor + WAF, all provisioned in the `pingress` project (VPC materialised by the future `gcp-ingress-baseline`). From `pingress`, traffic reaches backend services via Private Service Connect / internal LB paths &mdash; not via the FortiGate.
+
+Rationale:
+- Google's edge already provides DDoS protection, TLS termination, and WAF at scale &mdash; forcing traffic through a self-managed FortiGate afterward would add latency and a stateful chokepoint without security benefit.
+- Global External LBs cannot use a self-managed NVA as a backend; the architecture is prescriptive.
+- Consolidating public ingress into `pingress` (with its own Internet path) keeps the FortiGate focused on the traffic it can meaningfully inspect (egress + east-west).
+
+Full rationale in [ADR-0008](adr/0008-ingress-bypasses-perimeter-appliance.md).
 
 ## The two organization modes
 
@@ -71,10 +136,12 @@ Every stack in this repo honours `organization_mode` with two values:
 
 | Mode | Behaviour | Use case |
 |---|---|---|
-| `existing` (default) | Every resource is a data source. Terraform reads pre-existing folders / projects and re-exports them via the contract. Zero side effects. | Any pre-existing customer Org — bring-your-own. |
+| `existing` (default) | Every resource is a data source. Terraform reads pre-existing folders / projects and re-exports them via the contract. Zero side effects. | Any pre-existing customer Org &mdash; bring-your-own. |
 | `create` | Vanilla Terraform provisions folders + platform projects + org-policies + org-sink. Full IaC control. | Greenfield deployment. |
 
-There is no `blueprint` or `control_tower` mode in v0.1.0. Google Cloud Foundation Fabric is Terraform code you consume, not a runtime peer of Terraform in the way AWS Control Tower is. If Fabric integration becomes a hard requirement, it lands as a future `blueprint` mode. Full rationale in [ADR-0001](adr/0001-two-modes-only-existing-and-create.md).
+In both modes, stack `00-org-baseline` remains an **anchor + baseline** (see the section above) &mdash; the `create` mode of Tier 0 refers to *folders + projects + policies + org-sink*, not the Organization itself.
+
+There is no `blueprint` or `control_tower` mode in v0.2.0. Google Cloud Foundation Fabric is Terraform code you consume, not a runtime peer of Terraform in the way AWS Control Tower is. If Fabric integration becomes a hard requirement, it lands as a future `blueprint` mode. Full rationale in [ADR-0001](adr/0001-two-modes-only-existing-and-create.md).
 
 The two modes produce the **same output shape** (see [contract.md](contract.md)) so downstream consumers stay agnostic.
 
@@ -82,84 +149,82 @@ The two modes produce the **same output shape** (see [contract.md](contract.md))
 
 ### `00-org-baseline`
 
-- **Owns**: `data "google_organization"` (always a data source — GCP does not let you create Organizations from Terraform), and optionally `google_essential_contacts_contact` at the Organization scope for security / billing / technical notifications.
-- **Inputs of note**: `organization_domain` (used to look up the Org), `billing_account_id` (passed through to `20-projects`), `essential_contacts` (map of category → email list).
-- **Outputs**: `organization_id`, `organization_domain`, `billing_account_id`, `mode`.
+- **Role**: **anchor + baseline** (see the section above). Publishes contract facts, provisions minimal org-scope elements not owned by any discipline.
+- **Owns**:
+  - `data "google_organization" "this"` &mdash; looked up by `var.organization_domain`. **Always a data source**: GCP does not allow Terraform to create Organizations (they arrive with your Google Workspace / Cloud Identity tenant). See [ADR-0001](adr/0001-two-modes-only-existing-and-create.md).
+  - `google_essential_contacts_contact` per entry in `var.essential_contacts` &mdash; only when `var.enable_essential_contacts = true`. Meets the [content rule](#content-rule-for-stack-00-org-baseline): org-scope + fundacional + no-discipline.
+- **Inputs of note**: `organization_domain` (used to look up the Org), `billing_account_id` (passed through to `20-projects`), `essential_contacts` (map of category &rarr; email list).
+- **Outputs**: `organization_id`, `organization_name`, `organization_domain`, `billing_account_id`, `mode`.
 
 ### `10-folders`
 
-- **Owns**: the folder tree. Accepts a nested map of folder names → children (arbitrary depth up to GCP's 10-level limit).
-- **Reference tree** (default, aligned with Cloud Foundation Fabric):
-  - `Platform` — holds the platform projects created in stack `20`.
-  - `LandingZones` — parent of every Tier 2 LZ's projects. Sub-folders per environment optional (`Production`, `NonProduction`).
-  - `Sandbox` — ephemeral / experimental projects.
-- **Modes**: `create` provisions; `existing` reads pre-existing folders by display-name lookup.
+- **Owns**: the v0.2.0 folder tree (three depths). Reference set defaults reproduce the architecture diagrams:
+  - Roots: `Platform`, `LandingZones`, `Sandbox`.
+  - Children under `Platform`: `Logs`, `Management`, `IAM`, `DNS`, `Ingress` (1:1 per platform project).
+  - Children under `LandingZones`: `HUB` (flat), `HostPrj` and `ServicePrj` (env-split).
+  - Grandchildren under `HostPrj` and `ServicePrj`: `PRO`, `PRE`, `DEV` (default env set).
+- **Modes**: `create` provisions via three resource blocks (roots / children / grandchildren); `existing` reads via `var.existing_folder_ids` (operator provides the map).
 
 ### `20-projects`
 
-- **Owns**: the platform projects, provisioned via the shared `projects` module (`git::…/terraform-gcp-modules.git//modules/projects?ref=v0.1.0`).
-- **Reference project set** (default, one per platform concern):
-  - `plogs` — org sink destination + centralized logs, hosted in the `Platform` folder.
-  - `pmgm` — KMS central + management, hosted in `Platform`.
-  - `piam` — identity foundation (WIF pools land here in `gcp-identity-baseline`).
-  - `pdns` — Cloud DNS host (zones land here in `gcp-dns-baseline`).
-  - `pingress` — shared ingress baseline.
-  - `sandbox` — sandbox, hosted in the `Sandbox` folder.
-- **`deletion_policy = "PREVENT"`** on every platform project (provider &gt;=6 default). Rationale: deleting a platform project cascades into every service and every audit log — accidental `terraform destroy` must fail loud. To genuinely destroy, override the policy per project, apply, then destroy.
-- **Modes**: `create` provisions; `existing` reads by project ID.
+- **Owns**: the platform projects, provisioned via the shared `projects` module (`git::…/terraform-gcp-modules.git//modules/projects?ref=v0.1.0`) instantiated **once per home folder** via `for_each`.
+- **Default role &rarr; folder mapping** (`var.platform_project_home_folder`):
 
-### `30-org-policies` (planned v0.2.0)
+  | Role | Home folder (v0.2.0 default) | Project ID |
+  |---|---|---|
+  | `plogs` | `Logs` | `gcp0-prj-emp-plogs-01` |
+  | `pmgm` | `Management` | `gcp0-prj-emp-pmgm-01` |
+  | `piam` | `IAM` | `gcp0-prj-emp-piam-01` |
+  | `pdns` | `DNS` | `gcp0-prj-emp-pdns-01` |
+  | `pingress` | `Ingress` | `gcp0-prj-emp-pingress-01` |
+  | `sandbox` | `Sandbox` | `gcp0-prj-emp-sandbox-01` |
+
+- **`deletion_policy = "PREVENT"`** on every platform project (provider &ge; v6 default). Accidental `terraform destroy` fails loud.
+- **Modes**: `create` provisions; `existing` reads by project ID.
+- **State migration from v0.1.0**: shipped via `moved` blocks in [`main.tf`](../stacks/20-projects/main.tf); folder reparent is an in-place `google_project.folder_id` update, no recreation.
+
+### `30-org-policies` (planned v0.3.0)
 
 - **Owns**: `google_org_policy_policy` at Org scope, curated catalogue with per-policy `enable_X` switches.
-- **All policies default to `dry_run = true`** — surfaces violations in the audit log without blocking. Consumers flip to enforce individually after review.
-- **Catalogue** (initial 8):
-  - `iam.disableServiceAccountKeyCreation` — force WIF.
-  - `compute.requireOsLogin` — auditable SSH via IAM.
-  - `compute.vmExternalIpAccess` — deny all external IPs on VMs; force NAT / IAP.
-  - `storage.publicAccessPrevention` — block public buckets.
-  - `sql.restrictPublicIp` — Cloud SQL private-IP only.
-  - `iam.allowedPolicyMemberDomains` — restrict IAM member domains (opt-in; requires `allowed_customer_ids`).
-  - `compute.trustedImageProjects` — VM image allow-list (opt-in).
-  - `gcp.resourceLocations` — region pinning (opt-in; defaults to `in:eu-locations`).
-- **Custom policies**: `custom_org_policies` map for arbitrary additions.
+- **All policies default to `dry_run = true`** &mdash; surfaces violations in the audit log without blocking. Consumers flip to enforce individually after review.
 
-### `40-org-logging` (planned v0.2.0)
+### `40-org-logging` (planned v0.3.0)
 
 - **Owns**: `google_logging_organization_sink` at Org scope, IAM binding on `plogs` for the sink's writer identity.
-- **Filter default**: `""` (all logs). Consumers can override with a curated filter for cost control.
-- **Downstream**: `gcp-observability-baseline` consumes `log_sink_writer_identity` + `log_sink_destination` and configures buckets / retention / exports inside `plogs`.
+- **Downstream**: `gcp-observability-baseline` consumes `log_sink_writer_identity` and grants the sink write access on its central log bucket. Baseline is designed as a deferred integration &mdash; today (Tier 0 pre-v0.3.0) the baseline runs project-scoped; when this stack ships, the operator wires the writer identity into `var.org_sink_writer_identity` on the baseline.
 
-### `50-org-iam` (planned v0.3.0)
+### `50-org-iam` (planned v0.4.0)
 
 - **Owns**: `google_organization_iam_member` for a curated set of org-scope roles (Org Admin, Project Creator, Billing Admin, Security Admin, break-glass user).
 - **Excludes** Workforce Identity Federation (see [ADR-0004](adr/0004-no-workforce-identity-federation-here.md)) and identity-baseline's custom roles.
 
-### `60-tags` (planned v0.3.0)
+### `60-tags` (planned v0.4.0)
 
 - **Opt-in** (`create_tags = false` default).
-- **Owns**: `google_tags_tag_key` + `google_tags_tag_value` at Org scope for cross-tier governance (e.g. `environment=prod|nonprod`, `data-classification=public|internal|confidential`). Also demonstrates one tag-based IAM condition as reference.
+- **Owns**: `google_tags_tag_key` + `google_tags_tag_value` at Org scope for cross-tier governance.
 
 ## Apply order
 
 Within this repo:
 
 ```
-00-org-baseline → 10-folders → 20-projects → (30 → 40 → 50 → 60 once shipped)
+00-org-baseline → 10-folders → 20-projects → (30 → 40 once shipped) → (50 → 60 once shipped)
 ```
 
 Downstream (Tier 1 baselines + Tier 2 LZs) consumes Tier 0 via `terraform_remote_state`. Both wait for Tier 0 to be applied at least through `20-projects` (that's where `platform_project_ids` becomes available).
 
 ## What this repo does NOT do
 
-- **Does not create the Organization itself** — it's a Google Workspace / Cloud Identity artefact.
-- **Does not deploy VPCs, NAT, firewalls, or FortiGates** — that's Tier 2.
-- **Does not deploy DNS zones, log dashboards, KMS keys, or SCC config** — that's Tier 1 (inside the platform projects this repo creates).
-- **Does not configure Workforce Identity Federation** — that's Tier 1 identity-baseline. See [ADR-0004](adr/0004-no-workforce-identity-federation-here.md).
-- **Does not manage the state bucket** — bootstrap is a one-time shell script.
+- **Does not create the Organization itself** &mdash; it's a Google Workspace / Cloud Identity artefact. Stack `00-org-baseline` **anchors** to it (see the anchor + baseline pattern above).
+- **Does not deploy VPCs, NAT, firewalls, or FortiGates** &mdash; that's Tier 2. The FortiGate perimeter appliance lives in `pnet-hub` (created by the LZ). See [ADR-0008](adr/0008-ingress-bypasses-perimeter-appliance.md) for the ingress-bypasses-perimeter design.
+- **Does not deploy DNS zones, log dashboards, KMS keys, or SCC config** &mdash; that's Tier 1 (inside the platform projects this repo creates).
+- **Does not configure Workforce Identity Federation** &mdash; that's Tier 1 identity-baseline. See [ADR-0004](adr/0004-no-workforce-identity-federation-here.md).
+- **Does not manage the state bucket** &mdash; bootstrap is a one-time shell script.
 
 ## Failure modes and blast radius
 
-- **`create` mode against pre-existing folders with the same display name** — `google_folder` errors on unique constraint at parent scope. Recovery: switch to `existing` mode, or delete the pre-existing folder (unlikely acceptable).
-- **First apply of stack `40-org-logging` (v0.2.0)** — org-sink writer identity propagation lag can cause the follow-on `google_project_iam_member` binding to fail with "principal not found". Recovery: re-apply after 30 seconds; Terraform retries the binding cleanly.
-- **`terraform destroy` on stack `20-projects`** — fails by design because every platform project inherits `deletion_policy = "PREVENT"`. To genuinely destroy, override the policy per project, apply, then destroy. Two-step protection is intentional.
-- **Org-policy enforcement (v0.2.0) breaking a live workload** — mitigated by `dry_run = true` default in the catalogue. A policy flipped to enforce that breaks workloads is a rollback: revert the specific `enable_X` switch, apply.
+- **`create` mode against pre-existing folders with the same display name** &mdash; `google_folder` errors on unique constraint at parent scope. Recovery: switch to `existing` mode, or delete the pre-existing folder (unlikely acceptable).
+- **First apply of stack `40-org-logging` (v0.3.0)** &mdash; org-sink writer identity propagation lag can cause the follow-on `google_project_iam_member` binding to fail with "principal not found". Recovery: re-apply after 30 seconds; Terraform retries the binding cleanly.
+- **`terraform destroy` on stack `20-projects`** &mdash; fails by design because every platform project inherits `deletion_policy = "PREVENT"`. To genuinely destroy, override the policy per project, apply, then destroy. Two-step protection is intentional.
+- **Home folder key mismatch in `platform_project_home_folder`** &mdash; the project falls back to the Organization root (with a plan-time warning via precondition). Fix the mapping and re-apply; `google_project.folder_id` updates in place.
+- **Org-policy enforcement (v0.3.0) breaking a live workload** &mdash; mitigated by `dry_run = true` default in the catalogue. A policy flipped to enforce that breaks workloads is a rollback: revert the specific `enable_X` switch, apply.

@@ -1,37 +1,43 @@
 ###############################################################################
 # File:        stacks/20-projects/outputs.tf
 # Author:      Ismael Cruz
-# Version:     0.1.0
+# Version:     0.2.0
 # Description: Public contract of the platform-projects stack. Both modes
 #              produce the same output shape (map keyed by role) so
-#              downstream consumers stay agnostic to how the projects
-#              arrived.
+#              downstream consumers stay agnostic to how the projects were
+#              provisioned or referenced.
 ###############################################################################
 
 output "platform_project_ids" {
   description = "Map of role → project ID. Reference roles: plogs, pmgm, piam, pdns, pingress, sandbox. Keys align with the GCP LZs' existing_project_ids input."
-  value = local.will_create ? merge(
-    try(module.platform_projects[0].project_ids, {}),
-    try(module.sandbox_projects[0].project_ids, {}),
-    ) : (
+  value = local.will_create ? merge([
+    for _, m in module.projects_per_folder : try(m.project_ids, {})
+    ]...) : (
     local.will_read ? local.existing_ids_filtered : {}
   )
 }
 
 output "platform_project_numbers" {
-  description = "Map of role → project number (string). Needed by IAM bindings and log destinations that reference project number rather than ID. Empty in 'existing' mode (project numbers can be looked up via a data source in the consumer if needed)."
-  value = local.will_create ? merge(
-    try(module.platform_projects[0].project_numbers, {}),
-    try(module.sandbox_projects[0].project_numbers, {}),
-  ) : {}
+  description = "Map of role → project number (string). Needed by IAM bindings and log destinations that reference project number rather than ID. Empty in 'existing' mode."
+  value = local.will_create ? merge([
+    for _, m in module.projects_per_folder : try(m.project_numbers, {})
+  ]...) : {}
 }
 
 output "platform_project_names" {
   description = "Map of role → project display name."
-  value = local.will_create ? merge(
-    try(module.platform_projects[0].project_names, {}),
-    try(module.sandbox_projects[0].project_names, {}),
-  ) : {}
+  value = local.will_create ? merge([
+    for _, m in module.projects_per_folder : try(m.project_names, {})
+  ]...) : {}
+}
+
+output "platform_project_home_folders" {
+  description = "Map of role → home folder key where each project lives (v0.2.0). Useful for downstream stacks that need to scope IAM bindings or route policies to the folder that owns a project."
+  value = local.will_create || local.will_read ? {
+    for role, _ in local.role_enabled :
+    role => lookup(var.platform_project_home_folder, role, "__org__")
+    if local.role_enabled[role]
+  } : {}
 }
 
 output "mode" {

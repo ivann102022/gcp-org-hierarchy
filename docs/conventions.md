@@ -74,18 +74,30 @@ Output blocks use `try()` / `coalesce` to pick the right source.
 
 ## Folder naming
 
-Reference tree (default in `10-folders`):
+Reference tree (default in `10-folders`, v0.2.0):
 
 ```
 Organization (organizations/<org_id>)
-├── Platform                       (folders/xxxx)  # plogs, pmgm, piam, pdns, pingress
-├── LandingZones                   (folders/yyyy)  # per-LZ subfolders (created by each LZ)
-│   ├── Production                 (optional)
-│   └── NonProduction              (optional)
+├── Platform                       (folders/xxxx)
+│   ├── Logs                       # home of plogs
+│   ├── Management                 # home of pmgm
+│   ├── IAM                        # home of piam
+│   ├── DNS                        # home of pdns
+│   └── Ingress                    # home of pingress
+├── LandingZones                   (folders/yyyy)
+│   ├── HUB                        # home of pnet-hub (LZ-owned)
+│   ├── HostPrj                    # env-split
+│   │   ├── PRO                    # home of pnet-pro (LZ-owned)
+│   │   ├── PRE                    # home of pnet-pre (LZ-owned)
+│   │   └── DEV                    # home of pnet-dev (LZ-owned)
+│   └── ServicePrj                 # env-split
+│       ├── PRO                    # home of srv-pro (LZ-owned)
+│       ├── PRE                    # home of srv-pre (LZ-owned)
+│       └── DEV                    # home of srv-dev (LZ-owned)
 └── Sandbox                        (folders/zzzz)  # sandbox
 ```
 
-**Folder display names are PascalCase** &mdash; aligned with Google Cloud Foundation Fabric and visually distinguishing from project IDs (`snake_case_or_kebab-case`).
+**Folder display names are PascalCase** &mdash; aligned with Google Cloud Foundation Fabric and visually distinguishing from project IDs (`snake_case_or_kebab-case`). Depth-3 grandchildren under `HostPrj` and `ServicePrj` reuse the same short env name (`PRO` / `PRE` / `DEV`); Terraform's flat map keys them as composite `<parent>-<env>` (e.g. `HostPrj-PRO`) to avoid collision &mdash; see [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md).
 
 ## Platform project naming
 
@@ -95,16 +107,16 @@ Naming composed from the same global variables as the GCP LZs so IDs align witho
 ${org_prefix}-prj-${company}[-${division}]-<role>-${control}
 ```
 
-Reference roles (well-known &mdash; consumed by every baseline and LZ). Keys align with the existing GCP LZs' `existing_project_ids` map so consumers do not need a key-rename shim:
+Reference roles (well-known &mdash; consumed by every baseline and LZ). Keys align with the existing GCP LZs' `existing_project_ids` map so consumers do not need a key-rename shim. Home folder column reflects the v0.2.0 1:1 folder-per-platform-project layout ([ADR-0005](adr/0005-folder-per-platform-project.md)):
 
-| Role | Default ID (with defaults) | Purpose | Home folder |
+| Role | Default ID (with defaults) | Purpose | Home folder (v0.2.0) |
 |---|---|---|---|
-| `plogs` | `gcp0-prj-emp-plogs-01` | Centralized logs, org-sink destination | `Platform` |
-| `pmgm` | `gcp0-prj-emp-pmgm-01` | KMS central + management | `Platform` |
-| `piam` | `gcp0-prj-emp-piam-01` | Identity foundation (WIF pool created by `gcp-identity-baseline`) | `Platform` |
-| `pdns` | `gcp0-prj-emp-pdns-01` | Cloud DNS host (zones created by `gcp-dns-baseline`) | `Platform` |
-| `pingress` | `gcp0-prj-emp-pingress-01` | Shared ingress baseline | `Platform` |
-| `sandbox` | `gcp0-prj-emp-sandbox-01` | Single-instance sandbox (project ID uses the canonical `p` prefix; key stays `sandbox` for LZ compat) | `Sandbox` |
+| `plogs` | `gcp0-prj-emp-plogs-01` | Centralized logs, org-sink destination | `Logs` (under `Platform`) |
+| `pmgm` | `gcp0-prj-emp-pmgm-01` | KMS central + management | `Management` (under `Platform`) |
+| `piam` | `gcp0-prj-emp-piam-01` | Identity foundation (WIF pool created by `gcp-identity-baseline`) | `IAM` (under `Platform`) |
+| `pdns` | `gcp0-prj-emp-pdns-01` | Cloud DNS host (zones created by `gcp-dns-baseline`) | `DNS` (under `Platform`) |
+| `pingress` | `gcp0-prj-emp-pingress-01` | Shared ingress baseline (VPC materialised by future `gcp-ingress-baseline`) | `Ingress` (under `Platform`) |
+| `sandbox` | `gcp0-prj-emp-sandbox-01` | Single-instance sandbox | `Sandbox` (root) |
 
 Consumers must **not** hardcode project IDs. Always look them up from `data.terraform_remote_state.org.outputs.platform_project_ids["<role>"]`.
 

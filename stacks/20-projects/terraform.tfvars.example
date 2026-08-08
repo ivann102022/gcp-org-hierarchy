@@ -1,7 +1,7 @@
 ###############################################################################
 # File:        stacks/20-projects/terraform.tfvars.example
 # Author:      Ismael Cruz
-# Version:     0.1.0
+# Version:     0.2.0
 # Description: Example tfvars for the platform-projects stack.
 ###############################################################################
 
@@ -29,8 +29,9 @@ enable_platform_projects = true
 # organization_mode = "existing"
 
 # -----------------------------------------------------------------------------
-# 'create' mode — naming defaults produce IDs like gcp0-prj-emp-plogs-01.
-# Override only if your organisation's naming differs.
+# 'create' mode — naming defaults produce IDs like gcp0-prj-emp-plogs-01,
+# gcp0-prj-emp-sandbox-01, etc. Override only if your organisation's naming
+# differs.
 # -----------------------------------------------------------------------------
 
 # org_prefix = "myco"
@@ -61,6 +62,32 @@ enable_platform_projects = true
 #   pdns     = ["dns.googleapis.com"]
 #   pingress = ["compute.googleapis.com"]
 #   sandbox  = []
+# }
+
+# -----------------------------------------------------------------------------
+# v0.2.0 — role → home-folder mapping. Default reproduces the reference
+# architecture diagram (1:1 folder-per-platform-project per ADR-0005):
+#   plogs    → Logs        (Platform/Logs)
+#   pmgm     → Management  (Platform/Management)
+#   piam     → IAM         (Platform/IAM)
+#   pdns     → DNS         (Platform/DNS)
+#   pingress → Ingress     (Platform/Ingress)
+#   sandbox  → Sandbox     (Sandbox root)
+#
+# Requires 10-folders reference_platform_children to include the target
+# sub-folders (default already does).
+#
+# Override to collapse to the v0.1.0 flat layout (every project directly
+# under Platform); also set reference_platform_children = [] on 10-folders:
+# -----------------------------------------------------------------------------
+
+# platform_project_home_folder = {
+#   plogs    = "Platform"
+#   pmgm     = "Platform"
+#   piam     = "Platform"
+#   pdns     = "Platform"
+#   pingress = "Platform"
+#   sandbox  = "Sandbox"
 # }
 
 # -----------------------------------------------------------------------------

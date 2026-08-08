@@ -1,11 +1,11 @@
 ###############################################################################
 # File:        stacks/20-projects/locals.tf
 # Author:      Ismael Cruz
-# Version:     0.1.0
-# Description: Derived values for the platform-projects stack. Computes the
-#              per-role enable map, splits the reference set by home folder,
-#              composes canonical project IDs, and reads the folder tree +
-#              org outputs from remote state.
+# Version:     0.2.0
+# Description: Derived values for the platform-projects stack. Composes
+#              canonical project IDs and groups them by home folder so the
+#              shared 'projects' module can be instantiated once per
+#              distinct home folder via for_each.
 ###############################################################################
 
 locals {
@@ -22,8 +22,7 @@ locals {
   will_read   = local.is_read && var.enable_platform_projects
 
   # -----------------------------------------------------------------------------
-  # Per-role enable flags — respected in both modes (existing mode filters
-  # existing_project_ids so consumers cannot pull IDs for roles they disabled).
+  # Per-role enable flags — respected in both modes.
   # -----------------------------------------------------------------------------
   role_enabled = {
     plogs    = var.enable_plogs
@@ -37,41 +36,27 @@ locals {
   # -----------------------------------------------------------------------------
   # Canonical project ID composition — mirrors the GCP LZ single-instance
   # pattern:
-  #   ${org_prefix}-prj-${company}[-${division}]-<role_id_segment>-${control}
-  # role_id_segment is the 'p'-prefixed form (piam, plogs, ..., sandbox).
+  #   ${org_prefix}-prj-${company}[-${division}]-<role>-${control}
+  #
+  # v0.2.0: every role uses its own name as the ID segment (no more
+  # 'psandbox' special case) — aligned with the naming shown in the
+  # network topology diagram (gcp0-prj-emp-sandbox-01).
   # -----------------------------------------------------------------------------
-  id_segment_by_role = {
-    plogs    = "plogs"
-    pmgm     = "pmgm"
-    piam     = "piam"
-    pdns     = "pdns"
-    pingress = "pingress"
-    sandbox  = "sandbox"
-  }
-
   reference_project_ids = {
-    for role, seg in local.id_segment_by_role :
-    role => join("-", compact([var.org_prefix, "prj", var.company, var.division, seg, var.control]))
-    if local.role_enabled[role]
+    for role, enabled in local.role_enabled :
+    role => join("-", compact([var.org_prefix, "prj", var.company, var.division, role, var.control]))
+    if enabled
   }
 
   # -----------------------------------------------------------------------------
-  # Split by home folder — the shared 'projects' module accepts one parent
-  # per instantiation, so the stack calls it twice: Platform-folder set and
-  # Sandbox-folder set.
+  # Build the input map for the shared 'projects' module (one entry per
+  # enabled role). Extra services come from var.extra_services_by_role;
+  # the module ships a baseline set (compute, cloudresourcemanager, iam).
   # -----------------------------------------------------------------------------
-  platform_folder_roles = ["plogs", "pmgm", "piam", "pdns", "pingress"]
-  sandbox_folder_roles  = ["sandbox"]
-
-  # -----------------------------------------------------------------------------
-  # Build the input map for each shared-module instantiation. Extra services
-  # come from var.extra_services_by_role; the module already provides a
-  # baseline set (compute, cloudresourcemanager, iam) via its own defaults.
-  # -----------------------------------------------------------------------------
-  platform_projects_input = {
-    for role in local.platform_folder_roles :
+  enabled_role_inputs = {
+    for role, id in local.reference_project_ids :
     role => {
-      project_id = local.reference_project_ids[role]
+      project_id = id
       services = concat(
         ["compute.googleapis.com", "cloudresourcemanager.googleapis.com", "iam.googleapis.com"],
         lookup(var.extra_services_by_role, role, [])
@@ -82,24 +67,39 @@ locals {
         role       = role
       }
     }
-    if lookup(local.role_enabled, role, false) && contains(keys(local.reference_project_ids), role)
   }
 
-  sandbox_projects_input = {
-    for role in local.sandbox_folder_roles :
-    role => {
-      project_id = local.reference_project_ids[role]
-      services = concat(
-        ["compute.googleapis.com", "cloudresourcemanager.googleapis.com", "iam.googleapis.com"],
-        lookup(var.extra_services_by_role, role, [])
-      )
-      labels = {
-        managed_by = "terraform"
-        tier       = "0"
-        role       = role
-      }
+  # -----------------------------------------------------------------------------
+  # Group enabled projects by their home folder (v0.2.0 refactor). The
+  # shared 'projects' module accepts a single parent per invocation, so
+  # grouping produces one invocation per non-empty folder group.
+  #
+  # Per the default var.platform_project_home_folder mapping:
+  #   Logs        → { plogs }
+  #   Management  → { pmgm }
+  #   IAM         → { piam }
+  #   DNS         → { pdns }
+  #   Ingress     → { pingress }
+  #   Sandbox     → { sandbox }
+  #
+  # Every group has exactly one project by default — reflecting the 1:1
+  # folder-per-project decision (ADR-0005). Overrides that place multiple
+  # roles in one folder collapse into a single invocation with several
+  # projects (e.g. collapsing to the v0.1.0 flat layout with everything
+  # under Platform).
+  # -----------------------------------------------------------------------------
+  distinct_home_folders = distinct([
+    for role, _ in local.enabled_role_inputs :
+    lookup(var.platform_project_home_folder, role, "__org__")
+  ])
+
+  projects_by_folder = {
+    for folder in local.distinct_home_folders :
+    folder => {
+      for role, input in local.enabled_role_inputs :
+      role => input
+      if lookup(var.platform_project_home_folder, role, "__org__") == folder
     }
-    if lookup(local.role_enabled, role, false) && contains(keys(local.reference_project_ids), role)
   }
 
   # -----------------------------------------------------------------------------

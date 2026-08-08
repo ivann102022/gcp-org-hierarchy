@@ -1,7 +1,7 @@
 ###############################################################################
 # File:        stacks/10-folders/terraform.tfvars.example
 # Author:      Ismael Cruz
-# Version:     0.1.0
+# Version:     0.2.0
 # Description: Example tfvars for the folders stack.
 ###############################################################################
 
@@ -30,13 +30,46 @@ enable_folders = true
 # 'create' mode inputs.
 # -----------------------------------------------------------------------------
 
-# Reference tree is on by default when enable_folders = true and mode = create.
-# create_reference_folder_tree = true
+# create_reference_folder_tree = true    # default; provisions the full reference tree
 
-# Uncomment to add Production / NonProduction under LandingZones:
-# reference_landing_zone_children = ["Production", "NonProduction"]
+# -----------------------------------------------------------------------------
+# v0.2.0 defaults reproduce the reference architecture diagrams:
+#
+#   Platform      → 1:1 folder per platform project — see ADR-0005
+#                   default: ["Logs", "Management", "IAM", "DNS", "Ingress"]
+#
+#   LandingZones  → HUB (flat) + HostPrj & ServicePrj (env-split) — see ADR-0006
+#                   default: HUB has_environments=false; HostPrj & ServicePrj has_environments=true
+#                   env set:  ["PRO", "PRE", "DEV"]
+#
+#   Sandbox       → flat (root)
+#
+# Override any of these lists / maps to change the sub-folder set. Empty
+# reference_platform_children falls back to the v0.1.0 flat layout under
+# Platform (every platform project sits directly under Platform).
+# -----------------------------------------------------------------------------
 
-# Uncomment to add custom folders (arbitrary depth via parent_key chain):
+# reference_platform_children = ["Logs", "Management", "IAM", "DNS", "Ingress"]  # default
+
+# reference_landing_zone_children = {
+#   HUB        = { has_environments = false }
+#   HostPrj    = { has_environments = true }
+#   ServicePrj = { has_environments = true }
+# }
+
+# reference_landing_zone_environments = ["PRO", "PRE", "DEV"]   # default
+
+# Customer with more environments:
+# reference_landing_zone_environments = ["PRO", "PRE", "DEV", "STG", "QA"]
+
+# Customer with fewer environments:
+# reference_landing_zone_environments = ["PRO", "DEV"]
+
+# -----------------------------------------------------------------------------
+# Custom folders — attach at any depth via parent_key. LandingZones grandchildren
+# use composite keys ('<parent>-<env>').
+# -----------------------------------------------------------------------------
+
 # custom_folders = {
 #   Regulated = {
 #     display_name = "Regulated"
@@ -46,18 +79,41 @@ enable_folders = true
 #     display_name = "Production"
 #     parent_key   = "Regulated"   # nests under the Regulated folder above
 #   }
+#   MonitoringGrandchild = {
+#     display_name = "Monitoring"
+#     parent_key   = "Management"  # nests under Platform/Management (reference child)
+#   }
 # }
 
 # -----------------------------------------------------------------------------
 # 'existing' mode inputs — required when organization_mode = "existing".
-# GCP has no by-display-name folder lookup data source at the org scope,
-# so IDs are provided explicitly.
+# Keys must mirror the reference tree keys (including composite keys for
+# LandingZones grandchildren) and any custom folder keys.
 # -----------------------------------------------------------------------------
 
 # existing_folder_ids = {
-#   Platform       = "folders/1111111111"
-#   LandingZones   = "folders/2222222222"
-#   Sandbox        = "folders/3333333333"
-#   Production     = "folders/4444444444"     # if LandingZones/Production is in use
-#   NonProduction  = "folders/5555555555"
+#   # Depth 1 — roots
+#   Platform        = "folders/1111111111"
+#   LandingZones    = "folders/2222222222"
+#   Sandbox         = "folders/3333333333"
+#
+#   # Depth 2 — children under Platform
+#   Logs            = "folders/1111111112"
+#   Management      = "folders/1111111113"
+#   IAM             = "folders/1111111114"
+#   DNS             = "folders/1111111115"
+#   Ingress         = "folders/1111111116"
+#
+#   # Depth 2 — children under LandingZones
+#   HUB             = "folders/2222222223"
+#   HostPrj         = "folders/2222222224"
+#   ServicePrj      = "folders/2222222225"
+#
+#   # Depth 3 — LandingZones env grandchildren (composite keys)
+#   "HostPrj-PRO"    = "folders/2222222226"
+#   "HostPrj-PRE"    = "folders/2222222227"
+#   "HostPrj-DEV"    = "folders/2222222228"
+#   "ServicePrj-PRO" = "folders/2222222229"
+#   "ServicePrj-PRE" = "folders/2222222230"
+#   "ServicePrj-DEV" = "folders/2222222231"
 # }

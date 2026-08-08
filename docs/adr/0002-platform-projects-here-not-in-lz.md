@@ -60,9 +60,19 @@ Rejected: over-fragmentation. The project factory is intimately coupled to the f
 **C. Move platform projects to the individual baselines (`gcp-observability-baseline` creates `plogs`, `gcp-dns-baseline` creates `pdns`, ...).**
 Rejected: each baseline would need `roles/resourcemanager.projectCreator` at the folder level, which is a Tier 0 privilege. Baselines are supposed to run with project-scope permissions only. Also: creates a chicken-and-egg between baselines (which one creates `pmgm` if two baselines need KMS?).
 
+## Controls this decision supports
+
+Language convention: "supports controls typically found in..." not "complies with". Precise clause IDs live in [`../security/control-mapping.md`](../security/control-mapping.md).
+
+- **ISO/IEC 27001 &amp; 27002** &mdash; asset management and change management areas (single point of authority for platform project provisioning avoids drift).
+- **NIST CSF** &mdash; ID (Identify) function, asset management category.
+- **CIS Google Cloud Foundation Benchmark** &mdash; project management principles.
+- **Google Cloud Architecture Framework** &mdash; foundation pillar, particularly the pattern of a foundational Terraform layer that owns cross-tier resources.
+
 ## References
 
 - [`../architecture.md`](../architecture.md) &mdash; section "Why platform projects live here, not in each LZ".
 - [`../contract.md`](../contract.md) &mdash; `platform_project_ids` output spec.
 - [`../../../../shared-modules/terraform-gcp-modules/modules/projects/README.md`](../../../../shared-modules/terraform-gcp-modules/modules/projects/README.md) &mdash; the module this stack consumes.
 - Sibling LZ [`../../../../landing-zones/gcp-lz-fortinet-multiproject/stacks/00-network-core/terraform.tfvars.example`](../../../../landing-zones/gcp-lz-fortinet-multiproject/stacks/00-network-core/terraform.tfvars.example) &mdash; the `create_projects = true` fallback path.
+- [ADR-0005](0005-folder-per-platform-project.md), [ADR-0009](0009-layered-segmentation-hierarchy-first.md) &mdash; how the platform projects are placed in the segmentation model.

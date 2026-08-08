@@ -1,13 +1,15 @@
 <!--
 File:        docs/architecture.md
 Author:      Ismael Cruz
-Version:     0.2.0
+Version:     0.3.0
 Description: Architecture reference for gcp-org-hierarchy — the layered
              repo model in GCP, why hierarchy is Tier 0, the anchor + baseline
              framing for stack 00, the v0.2.0 folder tree (1:1 platform
              children + HostPrj/ServicePrj env-split under LandingZones),
-             and per-stack design rationale. Non-obvious decisions are
-             extracted to ADRs under docs/adr/.
+             the layered segmentation principle (v0.3.0), and per-stack
+             design rationale. Non-obvious decisions are extracted to ADRs
+             under docs/adr/. Framework alignment and maturity roadmap in
+             docs/security/.
 -->
 
 # Architecture
@@ -31,6 +33,18 @@ Cross-CSP contrast summarised:
 | **AWS** | You create it. `aws_organizations_organization`, OUs, accounts. No shortcut. |
 | **GCP** | Comes with Google Workspace / Cloud Identity. **Folders are optional structure inside it, but every enterprise wants them.** |
 | **Azure** | Comes with the Entra ID tenant. Management Groups are optional structure inside it. |
+
+## Layered segmentation &mdash; hierarchy is the first line
+
+Every non-trivial decision in this repo is grounded in a **three-scale segmentation model**. Segmentation is not delegated exclusively to the network:
+
+- **Scale 1 &mdash; Resource Hierarchy** (Folders + Projects). Question: *which administrative, security and governance domains do I want to separate?* This is where HostPrj/ServicePrj, PRO/PRE/DEV, and 1:1 folder-per-platform-project live. IAM inheritance through the folder tree is the primary control surface.
+- **Scale 2 &mdash; VPC** (VPC / Shared VPC / peering / NCC). Question: *which connectivity domains do I want to create?* HUB perimeter lives here.
+- **Scale 3 &mdash; Distributed Firewall** (VPC firewall rules, hierarchical firewall policies, tag-based rules). Question: *even if reachability exists, who is authorized to talk to whom?* GCP's implicit-deny model at this scale is what makes single-HUB defensible &mdash; the perimeter appliance is reserved for cross-domain transit, not for every east-west flow.
+
+Full principle in [ADR-0009](adr/0009-layered-segmentation-hierarchy-first.md). Its two direct consequences in this repo are documented in [ADR-0005](adr/0005-folder-per-platform-project.md) (Scale 1 for platform tier) and [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md) (Scale 1 for landing zones). The single-HUB decision in [ADR-0010](adr/0010-single-shared-perimeter-hub.md) is defensible *because* Scale 3 handles microsegmentation.
+
+Framework alignment for every decision is consolidated in [`security/control-mapping.md`](security/control-mapping.md); per-decision maturity paths (current / enhanced / high-isolation) in [`security/maturity.md`](security/maturity.md).
 
 ## Stack `00-org-baseline`: the anchor + baseline pattern
 
@@ -228,3 +242,9 @@ Downstream (Tier 1 baselines + Tier 2 LZs) consumes Tier 0 via `terraform_remote
 - **`terraform destroy` on stack `20-projects`** &mdash; fails by design because every platform project inherits `deletion_policy = "PREVENT"`. To genuinely destroy, override the policy per project, apply, then destroy. Two-step protection is intentional.
 - **Home folder key mismatch in `platform_project_home_folder`** &mdash; the project falls back to the Organization root (with a plan-time warning via precondition). Fix the mapping and re-apply; `google_project.folder_id` updates in place.
 - **Org-policy enforcement (v0.3.0) breaking a live workload** &mdash; mitigated by `dry_run = true` default in the catalogue. A policy flipped to enforce that breaks workloads is a rollback: revert the specific `enable_X` switch, apply.
+
+## Framework alignment and maturity
+
+Every architectural decision in this repo is mapped to the reference frameworks the portfolio supports (NIS2, ISO 27001/27002, NIST CSF, NIST SP 800-53, CIS GCP Foundation Benchmark, Google Cloud Architecture Framework) in [`security/control-mapping.md`](security/control-mapping.md). Per-decision maturity paths (current implementation / enhanced / high-isolation option) in [`security/maturity.md`](security/maturity.md).
+
+**Language convention**: framework references use "supports controls typically found in ..." rather than "complies with". Compliance depends on processes, evidence, people, and audit &mdash; not on a Terraform folder. See [`docs/adr/README.md`](adr/README.md#framework-language-convention).

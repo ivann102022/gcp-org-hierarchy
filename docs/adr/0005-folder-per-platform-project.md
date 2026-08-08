@@ -1,19 +1,21 @@
 <!--
 File:        docs/adr/0005-folder-per-platform-project.md
 Author:      Ismael Cruz
-Version:     0.1.0
+Version:     0.2.0
 -->
 
 # ADR-0005: One folder per platform project under `Platform` (1:1)
 
 **Status**: Accepted
-**Date**: 2026-08-07
+**Date**: 2026-08-07 (updated 2026-08-08 with segmentation-scale framing + controls + maturity path)
 **Deciders**: Ismael Cruz
-**Tags**: gcp, tier-0, folders, iam-scope, org-policies
+**Tags**: gcp, tier-0, folders, iam-scope, org-policies, macrosegmentation
 
 ## Context
 
-Tier 0 provisions six reference platform projects (`plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox`). At v0.2.0 design time three shapes for their folder placement presented themselves:
+Tier 0 provisions six reference platform projects (`plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox`). At v0.2.0 design time I evaluated three shapes for their folder placement. The choice sits at Scale 1 of the three-scale segmentation model (see [ADR-0009](0009-layered-segmentation-hierarchy-first.md)) &mdash; it decides which administrative and policy boundaries GCP's IAM inheritance can express for the platform tier.
+
+Three shapes:
 
 1. **Flat**: every platform project sits directly under `Platform`. Zero sub-folders.
 2. **Discipline-grouped**: sub-folders under `Platform` group projects by function &mdash; e.g. `Identity` (`piam`), `Management` (`plogs`, `pmgm`), `Connectivity` (`pdns`, `pingress`).
@@ -40,6 +42,18 @@ Option 3 (1:1) matches the number of folders to the number of projects, making I
 `sandbox` lives under the `Sandbox` root (not under `Platform`) &mdash; it's a distinct namespace, not a platform service.
 
 Implementation: `var.reference_platform_children` on `10-folders` defaults to `["Logs", "Management", "IAM", "DNS", "Ingress"]`; `var.platform_project_home_folder` on `20-projects` defaults to the mapping above.
+
+## Rationale
+
+The 1:1 mapping is what makes Scale 1 (Resource Hierarchy) actually work as a segmentation boundary for the platform tier. Without it, "the hierarchy segments things" is aspirational; with it, the hierarchy is the primary control surface for platform admin.
+
+Concretely, three properties emerge from the 1:1 mapping that any of the alternatives loses:
+
+- **IAM inheritance aligns with operational responsibility**: each platform project has a single-purpose operator (the DNS admin operates only `pdns`; the KMS admin operates only `pmgm`). Granting `roles/dns.admin` at the `DNS` folder is a one-line IAM statement that matches the human boundary exactly.
+- **Org policy attach points align with concern boundaries**: `constraints/compute.vmExternalIpAccess` (deny all) can attach at `DNS` where external IPs are never wanted, without leaking to `Ingress` where external IPs are the whole point of the project.
+- **Audit surfaces are unambiguous**: `gcloud asset search-all-resources --scope=folders/<Logs>` returns exactly `plogs`. No "wait, is `pmgm` also in this folder?" question.
+
+None of these properties are novel &mdash; they are the standard operational benefits of hierarchy-based IAM. The 1:1 shape is what materialises them for the platform tier of my portfolio.
 
 ## Consequences
 
@@ -74,6 +88,33 @@ Rejected: the split is arbitrary &mdash; why those two? Once we accept the 1:1 p
 **D. Nested by discipline THEN by project (`Platform/Connectivity/DNS`, `Platform/Connectivity/Ingress`).**
 Rejected: extra depth (4 levels: Org &rarr; Platform &rarr; Connectivity &rarr; DNS &rarr; project) without payback. Discipline layer would just be a naming convention, not adding IAM or policy benefit over 1:1 direct children.
 
+## Controls this decision supports
+
+Language convention: this ADR uses "supports controls typically found in ..." rather than "complies with". Precise clause IDs are consolidated in [`../security/control-mapping.md`](../security/control-mapping.md).
+
+- **NIS2** &mdash; access control area (Art. 21). 1:1 folder-per-project enables least-privilege IAM at the folder level with GCP inheritance.
+- **ISO/IEC 27001 &amp; 27002** &mdash; access control and least-privilege areas. Direct alignment between administrative role and folder scope.
+- **NIST CSF** &mdash; PR (Protect) function, access control category (least privilege).
+- **NIST SP 800-53** &mdash; access control family, particularly least-privilege and separation-of-duties controls.
+- **CIS Google Cloud Foundation Benchmark** &mdash; IAM section principles (least-privilege bindings at appropriate scope).
+- **Google Cloud Architecture Framework** &mdash; security pillar, especially the guidance on Resource Hierarchy as a primary IAM boundary.
+
+## Maturity path
+
+**Current implementation** &mdash; 5 sub-folders under `Platform` (Logs / Management / IAM / DNS / Ingress), one platform project each. `sandbox` under `Sandbox` root.
+
+**Enhanced**:
+- Add per-project org-policy attach points beyond the folder default: e.g. `constraints/iam.allowedPolicyMemberDomains` on `IAM` folder with tighter allowed_customer_ids than the org default.
+- Add hierarchical firewall policies at the `Ingress` folder scope for baseline ingress rules that individual `pingress` VPC firewalls cannot override.
+- Introduce tag-based IAM Conditions on folder bindings (via [`60-tags`](../../stacks/60-tags/README.md), planned) so `roles/dns.admin` on `DNS` further requires `env == prod` at binding time.
+
+**High-isolation option** (for regulated / sovereign platform services):
+- Split a platform concern into two folders when the compliance obligation demands it &mdash; e.g. `Logs` &rarr; `LogsRegulated` (SOX / GDPR-scoped) alongside `LogsGeneral`.
+- Wrap `IAM` and `Management` folders in VPC Service Controls perimeters (data-plane segmentation).
+- Consider Assured Workloads for the regulated sub-tree.
+
+This progression is documented in [`../security/maturity.md`](../security/maturity.md).
+
 ## References
 
 - [../architecture.md](../architecture.md) &mdash; the v0.2.0 folder tree.
@@ -81,3 +122,4 @@ Rejected: extra depth (4 levels: Org &rarr; Platform &rarr; Connectivity &rarr; 
 - [../../stacks/20-projects/README.md](../../stacks/20-projects/README.md) &mdash; `platform_project_home_folder` mapping.
 - [ADR-0002](0002-platform-projects-here-not-in-lz.md) &mdash; sibling decision: platform projects are owned by Tier 0.
 - [ADR-0006](0006-landing-zones-hostprj-serviceprj-env-split.md) &mdash; sibling decision: the LandingZones sub-tree shape.
+- [ADR-0009](0009-layered-segmentation-hierarchy-first.md) &mdash; segmentation Scale 1 principle; this ADR is the concrete Scale-1 decision for the platform tier.

@@ -82,11 +82,46 @@ Rejected: HUB has orthogonal responsibilities (egress inspection + east-west + V
 **D. Put public ingress LBs in each tenant project instead of centralised `pingress`.**
 Rejected: fragments Cloud Armor policy management (one policy per tenant instead of shared org-wide policies), fragments TLS certificate management, and loses the audit-single-project property. Central `pingress` is the right consolidation.
 
+## Controls this decision supports
+
+Language convention: this ADR uses "supports controls typically found in ..." rather than "complies with". Precise clause IDs are consolidated in [`../security/control-mapping.md`](../security/control-mapping.md).
+
+- **NIS2** &mdash; network security and threat detection areas (Art. 21). Cloud Armor provides WAF + DDoS + bot management at Google's edge; the perimeter appliance covers egress and cross-domain inspection separately (per [ADR-0010](0010-single-shared-perimeter-hub.md)).
+- **ISO/IEC 27001 &amp; 27002** &mdash; network controls, especially perimeter security and management of network services. Two distinct perimeter roles clearly separated (public ingress vs egress/east-west).
+- **NIST CSF** &mdash; PR (Protect) and DE (Detect) functions; particularly infrastructure resilience for public-facing services (Google Front End provides scale independent of self-managed capacity).
+- **CIS Google Cloud Foundation Benchmark** &mdash; guidance on Global LB configuration, Cloud Armor policies, TLS.
+- **OWASP ASVS / Top 10** &mdash; Cloud Armor pre-tuned rulesets cover common ingress-vector attacks.
+- **Google Cloud Architecture Framework** &mdash; security pillar, especially the recommended pattern for public-facing services (edge protection + private backends).
+
+## Maturity path
+
+**Current implementation** &mdash; public ingress via Global LB + Cloud Armor + WAF in `pingress`, backends reached via Private Service Connect / internal LB. Perimeter FortiGate handles egress + east-west + VPN only.
+
+**Enhanced**:
+- Add IAP (Identity-Aware Proxy) for admin ingress paths that today go through VPN + FortiGate &mdash; specific admin apps can move to context-aware access via IAP without a VPN, further reducing FortiGate scope.
+- Add reCAPTCHA Enterprise integration on Cloud Armor policies for user-facing endpoints.
+- Add Cloud Armor adaptive protection for automated anomaly detection.
+- Add Cloud CDN in front of Global LBs for cacheable content (reduces origin traffic + adds edge caching layer).
+
+**High-isolation option** (dedicated perimeters per exposure tier):
+- Separate `pingress` into multiple projects by exposure tier: `pingress-internet` (public internet), `pingress-partner` (B2B partner traffic via mutual TLS), `pingress-admin` (management ingress via IAP + strict allowlist).
+- Independent Cloud Armor policies, TLS certificates, and audit trails per exposure tier.
+- Reduces blast radius of a misconfiguration in one tier.
+
+**BeyondCorp option** (context-aware access as the primary perimeter for admin flows):
+- Move admin ingress fully to IAP + BeyondCorp Access Context Manager.
+- Remove VPN termination from FortiGate for admin users (workload-to-workload VPN with on-prem remains).
+- Users authenticate + context-check at every request rather than trusting a VPN tunnel.
+
+This progression is documented in [`../security/maturity.md`](../security/maturity.md).
+
 ## References
 
 - [../architecture.md](../architecture.md) &mdash; section "Why public ingress bypasses the perimeter appliance".
 - [ADR-0005](0005-folder-per-platform-project.md) &mdash; the `Ingress` folder that holds `pingress`.
 - [ADR-0006](0006-landing-zones-hostprj-serviceprj-env-split.md) &mdash; the HUB folder that holds the FortiGate perimeter appliance.
+- [ADR-0009](0009-layered-segmentation-hierarchy-first.md) &mdash; the three-scale segmentation model. Public ingress bypass is a Scale 2/3 decision (dedicated VPC + distributed authorization) reserving Scale 2 HUB for cross-domain transit.
+- [ADR-0010](0010-single-shared-perimeter-hub.md) &mdash; the FortiGate HUB scope explicitly excludes public ingress, which is why single HUB stays sized for egress/east-west only.
 - [GCP Global External Load Balancer backends](https://cloud.google.com/load-balancing/docs/backend-service) &mdash; canonical reference for the backend type constraint.
 - [Cloud Armor overview](https://cloud.google.com/armor) &mdash; the WAF/DDoS layer that terminates at Google's edge.
 - Future repo `baseline-projects/gcp-ingress-baseline/` (Tier 1, placeholder today) &mdash; will materialise VPC Ingress + Global LBs + Cloud Armor + TLS certs inside `pingress`.

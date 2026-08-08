@@ -1,0 +1,97 @@
+<!--
+File:        docs/security/maturity.md
+Author:      Ismael Cruz
+Version:     0.1.0
+Description: Maturity roadmap for the architectural decisions in this repo.
+             For each decision: current implementation (what I built), enhanced
+             (natural evolution for stronger requirements), high-isolation
+             option (what I would build for regulated / sovereign / high-trust
+             scenarios). The point is to show the current design as one point
+             on a spectrum, not as the only possible answer.
+-->
+
+# Maturity roadmap
+
+## Purpose
+
+Every decision in this repo represents **one point on a spectrum**. This document maps that point in three dimensions:
+
+1. **Current implementation** &mdash; what I built and shipped, matching the requirements of the customer engagements the portfolio is anonymised from.
+2. **Enhanced** &mdash; the natural evolution when the current design meets stricter requirements without changing the fundamental architecture. Additive controls; same shape.
+3. **High-isolation option** &mdash; what I would build if the customer had regulated / sovereign / high-trust requirements that the current design cannot meet.
+
+The point is not to say "the current design is incomplete" &mdash; it isn't; it meets the requirements it was built for. The point is to show that I know the spectrum and can position a customer at the right point on it.
+
+## Portfolio-level maturity signal
+
+A reviewer looking at this repo can read the maturity path in three ways:
+
+- **"This is what he did"** &mdash; the current implementation column shows the concrete design I have delivered.
+- **"Here's how he thinks it evolves"** &mdash; the enhanced column shows the natural next steps under increased scrutiny.
+- **"Here's how he handles hard cases"** &mdash; the high-isolation column shows the design for scenarios where the current design is insufficient.
+
+Missing any of these three would leave a gap: only column 1 reads as "he built one thing"; only column 3 reads as "he only knows extreme cases"; only column 2 reads as "he theorises about evolution without a starting point". All three together read as **judgment across the spectrum**.
+
+## Per-decision maturity
+
+### Layered segmentation ([ADR-0009](../adr/0009-layered-segmentation-hierarchy-first.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Three scales: Resource Hierarchy (Scale 1) + VPC (Scale 2) + distributed firewall (Scale 3). Sufficient for standard enterprise workloads. |
+| **Enhanced** | Add hierarchical firewall policies at folder scope. Add tag-based firewall rules using Resource Manager tags. Add Policy Controller / Config Sync gating on every apply. |
+| **High-isolation** | Introduce Scale 4 (data-plane segmentation): VPC Service Controls perimeters around sensitive projects; Private Service Connect for all internal service consumption; Access Context Manager access levels; Assured Workloads for regulated tenants. |
+
+### 1:1 folder per platform project ([ADR-0005](../adr/0005-folder-per-platform-project.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | 5 sub-folders under `Platform` (Logs / Management / IAM / DNS / Ingress), one platform project each. `sandbox` under `Sandbox` root. |
+| **Enhanced** | Per-project org-policy attach points beyond folder defaults. Hierarchical firewall policies at `Ingress` folder scope. Tag-based IAM Conditions on folder bindings. |
+| **High-isolation** | Split a platform concern into two folders when compliance demands it (e.g. `Logs` &rarr; `LogsRegulated` + `LogsGeneral`). Wrap `IAM` and `Management` folders in VPC Service Controls perimeters. Assured Workloads for the regulated sub-tree. |
+
+### HostPrj / ServicePrj + PRO/PRE/DEV split ([ADR-0006](../adr/0006-landing-zones-hostprj-serviceprj-env-split.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Role-first with `HUB` flat, `HostPrj` / `ServicePrj` env-split PRO/PRE/DEV. Team-based separation (Network+Security vs Systems+Applications). |
+| **Enhanced** | Per-BU sub-folders under each env grandchild (e.g. `HostPrj/PRO/BU-A`). Hierarchical firewall policies at `HostPrj` and `ServicePrj` folder scope. IAM Conditions on folder bindings. |
+| **High-isolation** | Parallel `LandingZones/Regulated/<env>` sub-tree with independent HUB, HostPrj, ServicePrj, stricter policy attach points. Access Context Manager access levels on the regulated sub-tree. Assured Workloads for regulated projects. |
+
+### Public ingress bypasses perimeter ([ADR-0008](../adr/0008-ingress-bypasses-perimeter-appliance.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Public ingress via Global LB + Cloud Armor + WAF in `pingress`; backends via Private Service Connect / internal LB. Perimeter FortiGate for egress + east-west + VPN only. |
+| **Enhanced** | Add IAP for admin ingress paths (bypassing VPN + FortiGate for management). reCAPTCHA Enterprise on Cloud Armor. Cloud Armor adaptive protection. Cloud CDN in front of Global LBs. |
+| **High-isolation** | Separate `pingress` by exposure tier (`pingress-internet`, `pingress-partner`, `pingress-admin`) with independent Cloud Armor policies, TLS certs, audit trails. |
+| **BeyondCorp option** | Move admin ingress fully to IAP + BeyondCorp Access Context Manager. Remove VPN termination for admin users (workload-to-workload VPN remains for on-prem integration). |
+
+### Single shared perimeter HUB ([ADR-0010](../adr/0010-single-shared-perimeter-hub.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Single HUB project with single FortiGate HA cluster shared across PRO / PRE / DEV. Cost-effective; relies on Scale 3 distributed firewall for microsegmentation. |
+| **Enhanced** | Hierarchical firewall policies at folder scope so PRO gets stricter rules than DEV even through the same appliance. Per-env IAM Conditions on the HUB project. Per-env log labels + dashboards + alert channels. |
+| **High-isolation** | HUB-per-environment (`HUB-PRO`, `HUB-PRE`, `HUB-DEV`) with independent FortiGate HA clusters. 3&#x00D7; cost accepted for full environmental isolation. Warranted for: PCI CDE, sovereign-cloud requirements, multi-tenant SaaS with different customer trust domains per env. |
+| **Dedicated CDE / regulated overlay** | Fourth HUB (`HUB-REGULATED`) alongside the shared HUB, dedicated to CDE or regulated-workload traffic. Distinct cluster, rules, and audit trail scoped to the compliance obligation. |
+
+### Anchor + baseline for stack `00-org-baseline` ([ADR-0007](../adr/0007-content-rule-for-org-baseline.md))
+
+| Dimension | Detail |
+|---|---|
+| **Current** | Data-source anchor + essential contacts. Content rule (org-scope + fundacional + not-a-discipline) prevents catch-all creep. |
+| **Enhanced** | Add Cloud Asset Inventory feed configuration at org scope (if not routed via `40-org-logging`). Add org-level metadata / labels if GCP surface expands. |
+| **High-isolation** | The content rule protects against absorption of discipline-specific concerns; no additional isolation controls apply at this layer. |
+
+## Cross-decision maturity story
+
+If I roll these individual maturity paths up into a portfolio-level statement:
+
+**Current portfolio position** &mdash; enterprise-standard GCP foundation for customers running non-regulated workloads. Three-scale segmentation gives defense-in-depth; single perimeter HUB with distributed firewall balances cost and control; deliberate exclusion of ingress from the perimeter path uses Google's edge efficiently.
+
+**Enhanced portfolio position** &mdash; add hierarchical firewall policies, tag-based governance, Policy Controller, IAP for admin flows. Same fundamental architecture, stricter enforcement. Typically warranted for financial services (non-CDE), healthcare (non-HIPAA-scoped), critical infrastructure operators under NIS2.
+
+**High-isolation portfolio position** &mdash; HUB-per-env, regulated-workload sub-tree, VPC Service Controls perimeters, Assured Workloads, BeyondCorp for admin access, Access Context Manager everywhere. Warranted for PCI CDE, sovereign-cloud, multi-tenant SaaS with different customer trust domains, or GxP-validated systems.
+
+Each level is a natural evolution of the previous &mdash; not a rebuild. That progression is itself the portfolio's message: **I know the spectrum and can move customers along it as requirements change**.

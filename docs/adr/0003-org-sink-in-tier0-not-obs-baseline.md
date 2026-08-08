@@ -68,8 +68,22 @@ Rejected: one resource + one IAM binding does not warrant a repo. The natural ho
 **C. Manage the org sink outside Terraform (console / gcloud one-shot).**
 Rejected: portfolio-wide policy is IaC-only. A manually-created sink drifts silently and is not reproducible.
 
+## Controls this decision supports
+
+Language convention: "supports controls typically found in..." not "complies with". Precise clause IDs live in [`../security/control-mapping.md`](../security/control-mapping.md).
+
+- **NIS2** &mdash; incident detection and logging areas (Art. 21). Org-wide log aggregation is the foundation for any cross-tenant detection strategy.
+- **ISO/IEC 27001 &amp; 27002** &mdash; logging and monitoring area, event logging control. Org-scope sink centralises the collection point.
+- **NIST CSF** &mdash; DE (Detect) function, anomalies and events category. PR (Protect) function, protective technology category (audit log capability).
+- **NIST SP 800-53** &mdash; AU (Audit and Accountability) family, especially AU-2 event logging and AU-12 audit record generation.
+- **CIS Google Cloud Foundation Benchmark** &mdash; logging section (aggregate sink at org level, non-modifiable retention).
+- **Google Cloud Architecture Framework** &mdash; operational excellence pillar (centralised observability) + security pillar (audit trail).
+
+The least-privilege benefit (baseline doesn't hold org-scope IAM) directly supports NIST SP 800-53 AC-6 and ISO 27002 access control areas.
+
 ## References
 
 - [`../architecture.md`](../architecture.md) &mdash; section "Why the org log sink lives here, not in observability-baseline".
 - [`../contract.md`](../contract.md) &mdash; `log_sink_writer_identity` and `log_sink_destination` output spec (v0.2.0).
 - [GCP: Aggregated sinks](https://cloud.google.com/logging/docs/export/aggregated_sinks) &mdash; canonical reference for org-scope sinks and the writer identity IAM pattern.
+- Consumer: [`../../../../baseline-projects/gcp-observability-baseline/docs/adr/0001-observability-lives-in-plogs.md`](../../../../baseline-projects/gcp-observability-baseline/docs/adr/0001-observability-lives-in-plogs.md) &mdash; how the baseline picks up the sink writer identity from this stack.

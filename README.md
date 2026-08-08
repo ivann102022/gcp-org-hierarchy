@@ -1,17 +1,23 @@
 <!--
 File:        README.md
 Author:      Ismael Cruz
-Version:     0.2.0
+Version:     0.3.0
 Description: Entry point for gcp-org-hierarchy — Tier 0 of the GCP
              stacked-repo taxonomy. Anchors the portfolio to the pre-existing
              GCP Organization and administers the folder hierarchy, platform
              project factory, org policies, org-level logging sink, and
              org-scope IAM. Every GCP baseline (baseline-projects/gcp-*-baseline)
              and landing zone (landing-zones/gcp-lz-*) consumes this via
-             terraform_remote_state.
+             terraform_remote_state. v0.3.0 adds the layered segmentation
+             principle (ADR-0009), the single-HUB rationale (ADR-0010),
+             enriched trade-off + framework mapping in existing ADRs, and
+             the security/ documentation folder (control mapping + maturity
+             roadmap).
 -->
 
 # GCP Organization Hierarchy
+
+> **Portfolio note**: this repo documents a real GCP Tier 0 design I have delivered as the shared foundation across multiple enterprise customer engagements (anonymised). The specific shape (5 platform sub-folders 1:1 per project, HostPrj/ServicePrj env-split, single HUB with distributed firewall for microsegmentation) reflects design decisions I have made based on the operational split of network+security vs. systems teams and the economic + architectural trade-off of a single perimeter appliance. Every decision is documented per-ADR (`docs/adr/`) with the rationale, trade-offs I consciously accept, and the maturity path to stronger requirements (`docs/security/maturity.md`). Framework alignment (NIS2, ISO 27001, NIST CSF, CIS GCP, Google CAF) is consolidated in `docs/security/control-mapping.md` &mdash; using hedged language ("supports controls typically found in") because a Terraform folder is not by itself a compliance artifact.
 
 **Tier 0** of the GCP stacked-repo taxonomy. **Anchors** the portfolio to the pre-existing GCP Organization (which arrives with your Cloud Identity / Google Workspace tenant &mdash; Terraform cannot create it) and administers the org-scope elements Google leaves to you: the folder hierarchy, the platform project factory (`plogs`, `pmgm`, `piam`, `pdns`, `pingress`, `sandbox`), organization policies, the organization-level log sink, org-scope IAM bindings, essential contacts, and (optionally) resource-manager tag keys/values.
 
@@ -189,7 +195,20 @@ The prefix always points to the specific Tier 0 stack that publishes the needed 
 ## Status
 
 - **v0.1.0** shipped. Stacks `00-org-baseline`, `10-folders`, `20-projects` populated. Stacks `30`-`60` scaffolded with placeholder READMEs.
-- **v0.2.0** working tree contains: folder tree extended to depth 3 with 1:1 platform children (`Logs`/`Management`/`IAM`/`DNS`/`Ingress`) + `HostPrj`/`ServicePrj` env-split under `LandingZones` (ADR-0005, ADR-0006); role &rarr; home folder mapping in `20-projects` with `moved` blocks for in-place state migration; anchor + baseline framing formalised across docs + ADR-0007 (content rule); ADR-0008 (ingress bypasses perimeter appliance).
+- **v0.2.0** shipped. Folder tree extended to depth 3 with 1:1 platform children (`Logs`/`Management`/`IAM`/`DNS`/`Ingress`) + `HostPrj`/`ServicePrj` env-split under `LandingZones` (ADR-0005, ADR-0006); role &rarr; home folder mapping in `20-projects` with `moved` blocks for in-place state migration; anchor + baseline framing formalised across docs + ADR-0007 (content rule); ADR-0008 (ingress bypasses perimeter appliance).
+- **v0.3.0** &mdash; documentation-only release. Two new ADRs (0009 layered segmentation principle, 0010 single-HUB rationale with economic + architectural 2-layer justification). Existing ADRs enriched with Rationale / Trade-offs / Controls supported / Maturity path sections. New `docs/security/` folder with `control-mapping.md` (decision &times; framework matrix) and `maturity.md` (per-decision current / enhanced / high-isolation roadmap). Portfolio framing statement added.
+
+## Layered segmentation &mdash; the portfolio principle
+
+Every decision in this repo is grounded in a **three-scale segmentation model** (full principle in [ADR-0009](docs/adr/0009-layered-segmentation-hierarchy-first.md)):
+
+- **Scale 1** &mdash; Resource Hierarchy (Folders + Projects). Who administers what.
+- **Scale 2** &mdash; VPC / Shared VPC. Which connectivity domains exist.
+- **Scale 3** &mdash; Distributed firewall. Who is authorized to talk to whom.
+
+The centralised perimeter is reserved for the flows that require transit and inspection between domains &mdash; not for every east-west packet. That is what makes the single-HUB design ([ADR-0010](docs/adr/0010-single-shared-perimeter-hub.md)) defensible rather than a corner-cutting compromise.
+
+Framework alignment for every decision is in [`docs/security/control-mapping.md`](docs/security/control-mapping.md); per-decision maturity roadmap in [`docs/security/maturity.md`](docs/security/maturity.md).
 
 ## License
 

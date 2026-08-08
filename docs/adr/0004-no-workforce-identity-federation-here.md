@@ -65,6 +65,16 @@ Rejected: still Tier 0 in name and privilege, even if isolated by stack. The pri
 **C. Ship WIF in Tier 0 for "convenience of setup" (customer runs Tier 0 and immediately has federation).**
 Rejected: convenience over correctness. Customers running Tier 0 first also apply Tier 1 identity-baseline immediately after &mdash; the ergonomic gain is nil. And Tier 1 identity-baseline lands sooner (see portfolio roadmap) so the artificial split of WIF-in-Tier-0 would exist for a matter of weeks anyway.
 
+## Controls this decision supports
+
+Language convention: "supports controls typically found in..." not "complies with". Precise clause IDs live in [`../security/control-mapping.md`](../security/control-mapping.md).
+
+- **NIS2** &mdash; access control area (Art. 21). Least-privilege scoping of the WIF-management privilege (Tier 1 SA, not Tier 0 SA).
+- **ISO/IEC 27001 &amp; 27002** &mdash; access control area, least-privilege principle, privileged access management.
+- **NIST CSF** &mdash; PR (Protect) function, identity management + access control category.
+- **NIST SP 800-53** &mdash; AC (Access Control) family, particularly AC-6 (least privilege) and AC-2 (account management).
+- **Google Cloud Architecture Framework** &mdash; security pillar, especially the principle of restricting powerful roles to the smallest scope that makes sense.
+
 ## References
 
 - [`../architecture.md`](../architecture.md) &mdash; section "Why Workforce Identity Federation is not here".

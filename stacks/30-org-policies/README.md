@@ -18,13 +18,13 @@ The curated catalog and the dry-run-by-default design are documented in [ADR-001
 - `google_org_policy_policy.catalog` &mdash; one resource per enabled catalog entry (8 policies in v0.1.0 of the stack).
 - `google_org_policy_policy.custom` &mdash; one resource per entry in `var.custom_org_policies`.
 
-Both types attach at the Organization scope (`parent = organizations/<id>`). Policies inherit down the folder tree by default; downstream folders / projects can override or exempt via their own policy resources.
+Both types attach at the Organization scope (`parent = organizations/<id>`). Policies inherit to descendants by default. Folder- or project-scoped policies can further specialize the effective policy where the constraint semantics permit it &mdash; the exact behaviour (inheritance, replacement, merge) differs between managed and legacy constraints; consult the current GCP documentation for the specific constraint before relying on override behaviour.
 
 ## Curated catalog
 
 | Catalog key | GCP constraint | Purpose |
 |---|---|---|
-| `disable_sa_keys` | `iam.disableServiceAccountKeyCreation` | Kills user-managed SA keys; forces WIF / short-lived credentials |
+| `disable_sa_keys` | `iam.disableServiceAccountKeyCreation` | Prevents creation of user-managed SA keys; the portfolio uses Workload Identity Federation and short-lived credentials as the replacement pattern (other short-lived-credential approaches exist and remain compatible with this constraint) |
 | `require_oslogin` | `compute.requireOsLogin` | SSH via IAM (auditable) instead of project-wide SSH keys |
 | `deny_external_ip` | `compute.vmExternalIpAccess` (deny all) | No public IPs on VMs; forces Cloud NAT + IAP tunnels |
 | `prevent_public_storage` | `storage.publicAccessPrevention` | Blocks the "public bucket" data exposure vector |
@@ -39,7 +39,7 @@ Each policy is enabled individually (`enable_disable_sa_keys = true`, etc.) and 
 
 Recommended activation order in a live deployment (from safest to most operationally sensitive):
 
-1. `prevent_public_storage` &mdash; enable + enforce day 1. Near-zero false positive rate.
+1. `prevent_public_storage` &mdash; candidate for early enforcement, after confirming there is no intentional public-bucket use case in scope.
 2. `disable_sa_keys` &mdash; enable + enforce. WIF-first pipelines tolerate this immediately.
 3. `restrict_sql_public_ip` &mdash; enable + enforce. Private SQL is baseline.
 4. `require_oslogin` &mdash; enable in dry-run first; enforce after SSH via IAM is validated with real users.

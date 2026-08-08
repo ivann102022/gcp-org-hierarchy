@@ -38,13 +38,23 @@ Cross-CSP contrast summarised:
 
 Every non-trivial decision in this repo is grounded in a **three-scale segmentation model**. Segmentation is not delegated exclusively to the network:
 
-- **Scale 1 &mdash; Resource Hierarchy** (Folders + Projects). Question: *which administrative, security and governance domains do I want to separate?* This is where HostPrj/ServicePrj, PRO/PRE/DEV, and 1:1 folder-per-platform-project live. IAM inheritance through the folder tree is the primary control surface.
+- **Scale 1 &mdash; Resource Hierarchy** (Folders + Projects, working together). Question: *which administrative, security and governance domains do I want to separate?* **Folders establish governance and delegation domains** (IAM inheritance attach points, org-policy attach points, delegated administration scope). **Projects materialise resource, lifecycle and administrative boundaries** within those domains (APIs enabled, quotas, per-project IAM, billing linkage, distinct state ownership). Scale 1 segmentation does not end at Folders &mdash; Folder + Project work together as one scale. This is where HostPrj/ServicePrj, PRO/PRE/DEV, and 1:1 folder-per-platform-project live.
 - **Scale 2 &mdash; VPC** (VPC / Shared VPC / peering / NCC). Question: *which connectivity domains do I want to create?* HUB perimeter lives here.
 - **Scale 3 &mdash; Distributed Firewall** (VPC firewall rules, hierarchical firewall policies, tag-based rules). Question: *even if reachability exists, who is authorized to talk to whom?* GCP's implicit-deny model at this scale is what makes single-HUB defensible &mdash; the perimeter appliance is reserved for cross-domain transit, not for every east-west flow.
 
 Full principle in [ADR-0009](adr/0009-layered-segmentation-hierarchy-first.md). Its two direct consequences in this repo are documented in [ADR-0005](adr/0005-folder-per-platform-project.md) (Scale 1 for platform tier) and [ADR-0006](adr/0006-landing-zones-hostprj-serviceprj-env-split.md) (Scale 1 for landing zones). The single-HUB decision in [ADR-0010](adr/0010-single-shared-perimeter-hub.md) is defensible *because* Scale 3 handles microsegmentation.
 
 Framework alignment for every decision is consolidated in [`security/control-mapping.md`](security/control-mapping.md); per-decision maturity paths (current / enhanced / high-isolation) in [`security/maturity.md`](security/maturity.md).
+
+## Three consequences of Scale-1 = Folder + Project
+
+Making Scale 1 work as Folder + Project (not Folders alone) produces three architectural properties worth naming explicitly &mdash; they are consequences of the design, not additional decisions:
+
+**Host Project vs Service Project are administratively separate but network-related**. In Resource Manager terms, `pnet-pro` (in `HostPrj/PRO`) and `srv-pro` (in `ServicePrj/PRO`) are distinct Projects in distinct folder branches &mdash; distinct IAM scope, distinct APIs, distinct quota, distinct billing attribution. In networking terms, they are related via Shared VPC: `srv-pro` attaches to the VPC that lives in `pnet-pro`. **This is deliberate**: sharing network capacity is not the same as belonging to the same administrative domain. The two planes (Resource Manager and network) intersect at Shared VPC precisely so that Network+Security teams operating `HostPrj` can hand the workload teams operating `ServicePrj` a controlled network surface, without granting them any admin authority over the network itself.
+
+**PRO / PRE / DEV separation begins at the Resource Manager layer, not merely at network constructs**. `pnet-pro`, `pnet-pre`, `pnet-dev` are three distinct Projects with distinct IAM, distinct quotas, distinct enabled APIs, distinct billing lines, distinct log audit surfaces &mdash; before you even consider that each has its own Shared VPC. The alternative &mdash; one `pnet` project with three VPCs inside &mdash; would only separate by network, and would fail every non-network dimension of environment separation.
+
+**Tier 0 owns containers; Tier 1 owns capabilities inside those containers**. The clean phrase for the ownership split between this repo and the Tier 1 baselines. `gcp-org-hierarchy` creates `plogs`, `pmgm`, `piam`, `pdns`, `pingress` (the containers). `gcp-observability-baseline`, future `gcp-identity-baseline`, `gcp-dns-baseline`, future `gcp-security-baseline`, etc., populate them with capabilities (log buckets + exports + monitoring; WIF pools + custom roles; DNS zones + forwarding; SCC + KMS + Secret Manager). See [ADR-0002](adr/0002-platform-projects-here-not-in-lz.md) for the ownership rationale.
 
 ## Cloud Billing Account is outside the Resource Manager tree
 

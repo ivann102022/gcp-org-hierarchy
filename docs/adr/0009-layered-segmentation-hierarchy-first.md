@@ -29,10 +29,17 @@ Question: **which administrative, security and governance domains do I want to s
 
 Tools: Folders + Projects + IAM (inherited down the tree) + Organization Policies + delegated administration.
 
+**Folder and Project play distinct roles at this scale and must be understood together**:
+
+- **Folders** establish governance and delegation domains &mdash; they are attach points for IAM inheritance, org policies, and hierarchical firewall policies. A Folder is a *boundary declaration*.
+- **Projects** materialise resource, lifecycle and administrative boundaries within those domains &mdash; APIs enabled per Project, quotas per Project, distinct billing attribution per Project, distinct state ownership per Project. A Project is a *container of resources* with its own IAM surface, subordinate to the enclosing Folder's inheritance.
+
+Scale 1 segmentation does not end at Folders &mdash; Folder and Project work together as one scale. A well-designed Scale 1 has the right Folders (governance and delegation), the right Projects inside those Folders (resource and lifecycle boundaries), and coherent 1:1 or 1:N relationships between them (see ADR-0005 for the platform-tier choice).
+
 This is the **first frontier** &mdash; it segments before a single VPC exists. In my architectures, this is where:
 
 - HostPrj vs ServicePrj lives (different administrative domains: Network+Security teams operate HostPrj; Systems+Applications teams operate ServicePrj).
-- PRO / PRE / DEV split lives (different policy strengths per environment; PRO gets the strongest, DEV gets the loosest).
+- PRO / PRE / DEV split lives (different policy strengths per environment; PRO gets the strongest, DEV gets the loosest). Crucially, this separation begins at the Resource Manager layer (distinct Projects) before it appears at the network layer &mdash; distinct IAM, distinct quotas, distinct APIs, distinct billing lines per environment, not just distinct VPCs.
 - 1:1 folder-per-platform-project lives (granular IAM scoping so `roles/dns.admin` on `DNS` folder applies only to `pdns`).
 
 The hierarchy is not decoration around the network &mdash; it is the primary control surface.

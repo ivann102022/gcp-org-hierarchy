@@ -36,6 +36,7 @@ The LZ's `create_projects = true` mode is retained as a **fallback** for greenfi
 
 **Positive**:
 
+- **Tier 0 owns containers; Tier 1 owns capabilities inside those containers.** The clean phrase for the split. Tier 0 creates `plogs`, `pmgm`, `piam`, `pdns`, `pingress` (the containers); Tier 1 baselines populate them with capabilities (log buckets + exports + monitoring; WIF pools + custom roles; DNS zones + forwarding; SCC + KMS + Secret Manager). Ownership and privilege scope match the concern: Tier 0 SA holds org-scope; Tier 1 SAs hold project-scope only. See also [ADR-0003](0003-org-sink-in-tier0-not-obs-baseline.md), [ADR-0004](0004-no-workforce-identity-federation-here.md) for the same principle applied to specific resource types.
 - Every LZ, every baseline consumes the same `platform_project_ids` map from Tier 0's remote state. Zero drift by construction.
 - Platform project lifecycle (creation, movement between folders, `deletion_protection`) is governed by one repo. Blast radius of an accidental change is bounded.
 - Naming defaults align across the portfolio automatically &mdash; a customer that runs Tier 0 with defaults and any GCP LZ with defaults gets project IDs that match without operator intervention.

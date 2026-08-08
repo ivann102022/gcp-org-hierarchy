@@ -90,7 +90,13 @@ Not blocking normal operation &mdash; the sink works with the provider default. 
 
 ## From section 50 review (org-iam)
 
-### ✕ Bug: `roles/billing.admin` bound at Organization scope
+### ~~✕ Bug: `roles/billing.admin` bound at Organization scope~~ &mdash; FIXED in v0.5.0
+
+Removed from stack 50 entirely. Reasoning: `roles/billing.admin` has lowest-level grantable resource = Billing Account (not Organization). The user's decision during the review was to remove billing IAM from this stack until a concrete requirement drives adding it back (via one of the two future paths: `roles/billing.creator` at Org scope for account creation, or `google_billing_account_iam_member` at Billing Account scope for existing-account admin, likely in a dedicated `55-billing-iam` stack).
+
+Original detail preserved below for history:
+
+### ✕ Bug: `roles/billing.admin` bound at Organization scope (historical, fixed)
 
 **Where**: [`stacks/50-org-iam/locals.tf`](../stacks/50-org-iam/locals.tf) &mdash; `curated_role_members` map includes `"roles/billing.admin" = var.billing_admins`. [`stacks/50-org-iam/main.tf`](../stacks/50-org-iam/main.tf) then binds this via `google_organization_iam_member`, applying the role at Organization resource scope. [`stacks/50-org-iam/variables.tf`](../stacks/50-org-iam/variables.tf) `billing_admins` description says "Principals granted roles/billing.admin at Org scope".
 

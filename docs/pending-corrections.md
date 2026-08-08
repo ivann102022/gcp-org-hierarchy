@@ -88,6 +88,28 @@ Portfolio-quality signal: a rigorous review of shipped code always finds items. 
 
 Not blocking normal operation &mdash; the sink works with the provider default. But the doc/code divergence is a real correctness issue.
 
+## From section 50 review (org-iam)
+
+### ✕ Bug: `roles/billing.admin` bound at Organization scope
+
+**Where**: [`stacks/50-org-iam/locals.tf`](../stacks/50-org-iam/locals.tf) &mdash; `curated_role_members` map includes `"roles/billing.admin" = var.billing_admins`. [`stacks/50-org-iam/main.tf`](../stacks/50-org-iam/main.tf) then binds this via `google_organization_iam_member`, applying the role at Organization resource scope. [`stacks/50-org-iam/variables.tf`](../stacks/50-org-iam/variables.tf) `billing_admins` description says "Principals granted roles/billing.admin at Org scope".
+
+**What GCP says**: `roles/billing.admin` has **lowest-level grantable resource = Billing Account**, not Organization. The role's permissions are designed to administer a specific Billing Account (`billingAccounts/<id>`), which sits outside the Resource Manager tree (as documented in [architecture.md &mdash; Cloud Billing Account section](../docs/architecture.md)). Binding it at Organization scope with `google_organization_iam_member` does not match the role's intended scope semantics.
+
+**What was probably intended**: two possibilities, requiring a decision:
+
+1. **`roles/billing.creator` at Org scope** &mdash; if the intent is to grant principals the ability to **create new Billing Accounts** at the Organization level. This is genuinely Org-scope IAM and belongs in this stack (just rename the variable to `billing_creators` and swap the role).
+2. **`roles/billing.admin` at Billing Account scope** &mdash; if the intent is to grant principals the ability to **administer an existing Billing Account** (link projects, manage IAM on the account, close it). This requires a different resource (`google_billing_account_iam_member`) targeting the specific `billing_account_id` from [`00-org-baseline`](../stacks/00-org-baseline/) output. This is not Org-scope IAM strictly speaking &mdash; it's Billing IAM. It may deserve either a separate stack (`50-billing-iam` or similar) or a subsection here with a clear note about scope.
+
+**Fix direction**:
+1. Decide the intent (Billing Account creation vs administration of an existing Billing Account).
+2. If (1): rename `billing_admins` &rarr; `billing_creators`, swap role to `roles/billing.creator`, keep in this stack.
+3. If (2): remove `billing_admins` from the curated set here, create a dedicated Billing IAM binding (either in a new stack or a clearly-scoped subsection using `google_billing_account_iam_member`).
+4. Update `50-org-iam` README + ADR + control-mapping accordingly.
+5. The `billing_admins` row in the stack README is already flagged (v0.4.11) pointing at this correction.
+
+Not blocking operation &mdash; `google_organization_iam_member` accepts the binding syntactically. But the effective permissions granted at Org scope for this role may not match operator expectations, and it violates the "role + scope = blast radius" principle documented in [`50-org-iam` README](../stacks/50-org-iam/README.md).
+
 ## Convention for using this file
 
 - Each item lands here when a review section identifies it and stays here until a code release fixes it.

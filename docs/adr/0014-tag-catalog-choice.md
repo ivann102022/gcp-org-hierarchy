@@ -18,7 +18,7 @@ GCP Resource Manager tags (`google_tags_tag_key` / `google_tags_tag_value`) enab
 - **Tag-based IAM Conditions** &mdash; `roles/editor` on this project active only when `environment=prod` tag is present.
 - **Tag-based org policy conditions** &mdash; `constraints/compute.vmExternalIpAccess = deny` except when `environment=sandbox`.
 - **Tag-based hierarchical firewall rules** &mdash; source/destination filters by tag rather than by CIDR.
-- **Cost attribution** &mdash; billing labels linked to tags for finance rollup.
+- **Cost attribution** &mdash; Cloud Billing integrates directly with Resource Manager Tags for cost allocation and chargeback analysis; no intermediate label conversion required.
 
 Every one of these patterns is powerful. Together they can express governance the folder tree alone cannot (per-workload variation within a folder).
 
@@ -52,7 +52,7 @@ Every tag key ships with `purpose = "GCE_FIREWALL"` so the tag is usable for hie
 
 ### Why opt-in
 
-Enabling the stack is cheap (creates 4-6 tag keys and ~7 tag values). The cost is what happens after: every project the customer creates now needs a tagging decision. Every LZ needs to propagate tag bindings. Cost attribution requires enabling detailed billing export + BigQuery. IAM Conditions referencing tags require every human granting access to think about tags.
+Enabling the stack is cheap (creates 4-6 tag keys and ~7 tag values). The cost is what happens after: every project the customer creates now needs a tagging decision. Every LZ needs to propagate tag bindings. Cost attribution flows through Cloud Billing's native Tag integration (downstream reporting may still use billing export + BigQuery for advanced analytics, but the Tag &rarr; cost linkage itself does not require an intermediate mapping). IAM Conditions referencing tags require every human granting access to think about tags.
 
 If the customer is not ready for that operational discipline &mdash; if there is no team owning "tagging strategy", if finance is not consuming cost-center data, if there is no security-team pull for tag-based IAM Conditions &mdash; then shipping the catalog just creates unused GCP resources.
 
@@ -75,6 +75,8 @@ Tags I considered and rejected from the reference catalog:
 - **`region`**: redundant with the resource's actual region attribute. Tag adds no value.
 
 ### Why `purpose = "GCE_FIREWALL"`
+
+> **⚠ Under review** &mdash; the argument below (maximally-capable, no downside) is being re-examined during the disciplined portfolio review. Two concerns raised: (a) `GCE_FIREWALL` has specific semantics for Network Firewall Policies (secure tags) and may not be an inocuous default for governance tags (`cost-center`, `owner`, `data-classification`) whose primary use is IAM/billing/policy; (b) the property cannot be changed later without recreating the TagKey (as this same ADR acknowledges below), which makes it a decision that must be right the first time. See [`../pending-corrections.md`](../pending-corrections.md) for the specific research items. The code default is unchanged pending the research; the ADR text below reflects the original reasoning.
 
 Setting the purpose enables the tag to be used in hierarchical firewall policies (`google_compute_firewall_policy_rule` with `match { src_secure_tags = [...] }`). Without this purpose, the tag can be used for IAM Conditions and org policies but not for firewall rules.
 
@@ -124,7 +126,8 @@ Language convention: "supports controls typically found in ..." not "complies wi
 - Add automated tag binding via a Cloud Run / Cloud Function trigger on project creation (auto-tag new projects based on their folder path).
 - Add tag-based IAM Condition examples in `custom_org_iam_bindings` (see `50-org-iam`) demonstrating patterns for other engineers to follow.
 - Add tag-based org policy conditions in `30-org-policies` (e.g. `deny_external_ip` except when `environment=sandbox`).
-- Add BigQuery integration for tag-based cost attribution rollup.
+- Add BigQuery integration for tag-based cost attribution rollup (advanced analytics on top of the native Cloud Billing + Tags linkage).
+- **Mandatory tags via custom Organization Policy**: GCP supports enforcing that specific tag keys must be present on resources of specific types (Projects, Folders, some Compute/VPC resources); functionality currently in Preview per GCP docs. Combined with `30-org-policies` this converts a documented taxonomy into an enforced classification requirement &mdash; no Project created without an `environment` tag, no VM without a `data-classification` tag. Deliberately not in Current implementation because the feature is Preview and I have not yet deployed it in production.
 
 **High-isolation option**:
 - Add `compliance-scope` tag key with values `pci`, `hipaa`, `gdpr-strict`, `sovereign`, `none`. Bind on every project. Trigger stricter policies via IAM Conditions and org-policy conditions when compliance-scope tags are set.

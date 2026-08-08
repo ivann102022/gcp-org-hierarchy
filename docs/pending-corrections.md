@@ -110,6 +110,31 @@ Not blocking normal operation &mdash; the sink works with the provider default. 
 
 Not blocking operation &mdash; `google_organization_iam_member` accepts the binding syntactically. But the effective permissions granted at Org scope for this role may not match operator expectations, and it violates the "role + scope = blast radius" principle documented in [`50-org-iam` README](../stacks/50-org-iam/README.md).
 
+## From section 60 review (tags)
+
+### △/✕ Under review: `purpose = "GCE_FIREWALL"` as default for every TagKey
+
+**Where**: [`stacks/60-tags/main.tf`](../stacks/60-tags/main.tf) sets `purpose = "GCE_FIREWALL"` on every `google_tags_tag_key` in the reference catalog (`environment`, `data-classification`, `cost-center`, `owner`, plus any `custom_tag_keys`). [ADR-0014 "Why purpose = GCE_FIREWALL"](adr/0014-tag-catalog-choice.md) justifies this as "the maximally-capable choice for all reference keys" with "no downside".
+
+**What needs verification**:
+
+1. **Specific GCP semantics of `purpose = GCE_FIREWALL`**. This value activates the TagKey as a "secure tag" usable in Network Firewall Policies. The claim in ADR-0014 that this is a strictly-additive capability (does not affect IAM/billing/org-policy uses) needs verification against current GCP documentation. Secure tags have lifecycle and IAM implications that general-purpose Resource Manager Tags do not.
+2. **Whether it is appropriate for governance-only tags**. `cost-center` and `owner` have no meaningful firewall use case. Setting `GCE_FIREWALL` on them is defensible only if there is no downside; if there is any (extra IAM permission required to bind, extra API surface, extra billing, extra audit noise, changed inheritance behaviour, ...), then a `data_only` purpose (or the default no-purpose) would be more appropriate for those keys.
+3. **Irreversibility**. As ADR-0014 itself acknowledges, `purpose` cannot be changed after creation without recreating the TagKey (which destroys the value tree and breaks any binding). This raises the bar for accepting "maximally-capable, no downside" &mdash; the decision must be right the first time.
+
+**Possible outcomes of the research**:
+
+- **Confirm current default is correct**: research shows `GCE_FIREWALL` is genuinely inocuous for governance tags. Then update ADR-0014 with the specific evidence (which GCP docs, which sections) that supports the "no downside" claim, remove the ⚠ Under review notice, and consider the item closed.
+- **Split the purpose per tag class**: if `GCE_FIREWALL` has non-trivial semantics for governance tags, split the catalog into:
+  - Governance tags (`environment`, `data-classification`, `cost-center`, `owner`) with no firewall-specific purpose &mdash; used for IAM Conditions, billing, org-policy.
+  - Future secure-tag catalog (`app-tier`, `security-zone`, `inspection-required`, `trust-zone`, etc.) with `GCE_FIREWALL` &mdash; used for Network Firewall Policies.
+  
+  This is the split conceptually sketched in the section 60 review and would replace the "one purpose fits all" default with an intentional taxonomy per use case.
+
+**Fix direction**: this is one of the few pending items that is genuinely research-then-decide, not code-fix-only. The code change itself is small (change one line per tag key or introduce a per-key purpose in the variable schema); the decision about what to change to is what needs the research.
+
+**Not blocking operation**: the current default works; the concern is about whether it is the *right* default for a decision that cannot be changed later without pain.
+
 ## Convention for using this file
 
 - Each item lands here when a review section identifies it and stays here until a code release fixes it.

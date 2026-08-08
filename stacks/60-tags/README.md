@@ -8,7 +8,7 @@ Description: Documentation for the tags stack — Resource Manager tag keys
 
 # Stack `60-tags`
 
-Provisions **Resource Manager tag keys and tag values** at Organization scope for cross-tier governance: tag-based IAM Conditions, tag-based org policy exceptions, tag-based hierarchical firewall rules, cost attribution via billing labels linked to tags.
+Provisions **Resource Manager tag keys and tag values** at Organization scope for cross-tier governance: tag-based IAM Conditions, tag-based org policy exceptions, tag-based hierarchical firewall rules, and cost attribution via Cloud Billing's native integration with Resource Manager Tags (no intermediate label conversion required for the Tag &rarr; cost linkage).
 
 Opt-in (`enable_tags = false` by default) because tagging introduces ongoing operational cost &mdash; the value is only realised if downstream consumers actually bind tags to resources with discipline. Design rationale in [ADR-0014](../../docs/adr/0014-tag-catalog-choice.md).
 
@@ -17,7 +17,7 @@ Opt-in (`enable_tags = false` by default) because tagging introduces ongoing ope
 - `google_tags_tag_key` &mdash; one per entry in the merged catalog (reference + custom).
 - `google_tags_tag_value` &mdash; one per (key, value) pair. Parented to the tag key so Terraform's dependency graph orders creation correctly.
 
-Every key ships with `purpose = "GCE_FIREWALL"` so the tag can be used in hierarchical firewall policies. This does not force firewall use &mdash; the tag also works for standard IAM Conditions, billing labels, and org-policy conditions.
+Every key ships with `purpose = "GCE_FIREWALL"` so the tag can be used in hierarchical firewall policies. **⚠ Under review** &mdash; the claim that this purpose is "maximally-capable with no downside" for governance-only tags (cost-center, owner, data-classification) is being verified against current GCP semantics. See [`docs/pending-corrections.md`](../../docs/pending-corrections.md). No code change yet; documentation-level flag while research is done.
 
 ## Reference catalog (default)
 
@@ -34,7 +34,7 @@ Values match the portfolio's folder tree conventions (env values map to `PRO/PRE
 
 - Does not bind tags to resources &mdash; that's the responsibility of whichever stack owns the resource. This stack only provisions the taxonomy.
 - Does not create IAM Conditions or org-policy conditions that reference tags &mdash; example patterns are documented but not enforced here.
-- Does not create billing labels &mdash; billing labels are separate from tags in GCP. Cost attribution via tags requires enabling detailed billing export + a mapping in BigQuery, which is downstream tooling.
+- Does not create billing labels &mdash; Labels are a separate GCP mechanism (per-resource key/value metadata usable for billing filtering and inventory queries), independent from Resource Manager Tags. This stack ships Tags; Labels can be added separately at the resource-owning stacks where they apply. **Note**: Cost attribution via Tags does NOT require converting Tags to Labels &mdash; Cloud Billing integrates directly with Resource Manager Tags for cost allocation and chargeback. Downstream reporting may still use billing export + BigQuery for advanced analytics, but the Tag &rarr; cost linkage itself is native.
 
 ## Inputs
 

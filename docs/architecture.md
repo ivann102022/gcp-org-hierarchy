@@ -24,7 +24,7 @@ Tier 0  ORGANIZATION HIERARCHY         ← THIS REPO
 Tier -1 Shared modules                 (shared-modules/terraform-gcp-modules)
 ```
 
-Each tier knows only the one below via a documented contract. In GCP, Tier 0 exists because Google leaves the folder tree, the project factory, and the org policies to you &mdash; they arrive empty with your Cloud Identity tenant. This is different from AWS (where Tier 0 also creates the Organization itself) and closer to Azure (where the tenant arrives but Management Groups must be designed and provisioned).
+Each tier knows only the one below via a documented contract. In GCP, Tier 0 exists because Google provisions the Organization and may apply baseline security organization policies (the "secure by default" set introduced in 2024), but the customer remains responsible for designing and administering the target folder hierarchy, the project structure, and the organization-policy posture on top of that baseline. This is different from AWS (where Tier 0 also creates the Organization itself) and closer to Azure (where the tenant arrives but Management Groups must be designed and provisioned).
 
 Cross-CSP contrast summarised:
 

@@ -44,13 +44,37 @@ Additional policies land in `var.custom_org_policies`; the catalog is not the on
 | `disable_sa_keys` | `iam.disableServiceAccountKeyCreation` | High signal, low false-positive when WIF is set up. Almost every prior incident I have investigated involved a leaked SA key. Safe to enforce day 1 if the WIF story is ready. |
 | `require_oslogin` | `compute.requireOsLogin` | Kills project-wide SSH keys and forces SSH-via-IAM. Safe to enforce but needs a real-user test first (OS Login IAM roles must be set up for humans who SSH to VMs). |
 | `deny_external_ip` | `compute.vmExternalIpAccess` (deny all) | Powerful but breaks NAT-less setups. Only enforce after Cloud NAT is confirmed for every VPC / subnet workload can reach the internet. |
-| `prevent_public_storage` | `storage.publicAccessPrevention` | Safe to enforce day 1. The number of "public GCS bucket" incidents in the industry justifies this being the first policy every org enforces. |
-| `restrict_sql_public_ip` | `sql.restrictPublicIp` | Cloud SQL best practice is private-IP anyway. Safe to enforce day 1 unless there is legacy public-IP SQL. |
+| `prevent_public_storage` | `storage.publicAccessPrevention` | Strong candidate for early enforcement. The number of "public GCS bucket" incidents in the industry justifies enforcing this early once the operator has confirmed no intentional public-bucket use case is in scope. |
+| `restrict_sql_public_ip` | `sql.restrictPublicIp` | Cloud SQL best practice is private-IP anyway. Strong candidate for early enforcement unless there is legacy public-IP SQL. |
 | `allowed_policy_member_domains` | `iam.allowedPolicyMemberDomains` | Blocks IAM leaks to external tenants. Very effective. Requires the operator to know their Workspace `customer_id` (via `gcloud organizations list`). |
 | `trusted_image_projects` | `compute.trustedImageProjects` | Enforces VM image supply chain. Requires the operator to have catalogued which image projects are legitimate (typically `debian-cloud`, `ubuntu-os-cloud`, `cos-cloud`, plus custom golden-image projects). |
 | `resource_locations` | `gcp.resourceLocations` | Region pinning for data residency. Default `in:eu-locations` reflects the customer profiles I have worked with; override for US-only or specific-region deployments. |
 
 These 8 are the constraints I have consistently deployed across engagements. Others (VPC-SC, org-scope SCC, Assured Workloads) belong in dedicated stacks (data-plane / compliance) rather than the general-purpose catalog.
+
+### The catalog organises into four concern areas
+
+The 8 constraints are not arbitrary &mdash; they map onto four distinct security-concern areas. Reading the catalog through this lens makes the intent visible to a reviewer at a glance:
+
+```
+IDENTITY / ACCESS
+├── disable_sa_keys                (block long-lived exportable credentials)
+├── require_oslogin                 (SSH authorization via IAM, not shared keys)
+└── allowed_policy_member_domains   (block IAM leaks to external tenants)
+
+NETWORK EXPOSURE
+├── deny_external_ip                (no direct public exposure of VMs)
+└── restrict_sql_public_ip          (no direct public exposure of Cloud SQL)
+
+DATA PROTECTION
+├── prevent_public_storage          (no accidentally-public GCS buckets)
+└── resource_locations              (data-residency enforcement)
+
+SUPPLY CHAIN
+└── trusted_image_projects          (VM boot disk image allow-list)
+```
+
+The grouping is a documentation aid, not a variable in the code. It communicates what the catalog is defending against: three concerns (identity/access, network exposure, data protection) covering the most common misconfiguration vectors I have seen in enterprise GCP, plus a supply-chain constraint that closes the image provenance vector. If a reviewer questions "why these eight?", the answer is "because these four concern areas cover the highest-signal preventative controls at Org scope".
 
 ### Dry-run-first workflow
 

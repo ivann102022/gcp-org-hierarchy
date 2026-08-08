@@ -120,10 +120,17 @@ Honesty for the reader &mdash; single shared HUB is a defensible design, but the
 
 **Current implementation** &mdash; single shared HUB. Fits enterprise workloads with layered segmentation from [ADR-0009](0009-layered-segmentation-hierarchy-first.md). Cost / operational efficiency prioritised.
 
-**Enhanced** (retain single perimeter appliance, strengthen operational controls):
+**Enhanced &mdash; same project, per-env operational controls**:
 - Add hierarchical firewall policies at folder scope so PRO-destined flows have stricter rules than DEV even through the same appliance.
 - Add per-environment IAM condition constraints on the HUB project so operators managing DEV cannot inadvertently affect PRO.
 - Increase audit granularity: per-env log labels on FortiGate traffic logs, per-env dashboards, per-env alert channels.
+
+**Enhanced+ &mdash; same project, multiple FortiGate clusters per environment**:
+- Keep the single `pnet-hub` project (one IAM boundary, one Terraform state, one billing linkage).
+- Deploy **three FortiGate HA clusters** inside it (`fw-pro`, `fw-pre`, `fw-dev`), each on its own subnets / trust zones.
+- Route PRO traffic through `fw-pro`, PRE through `fw-pre`, DEV through `fw-dev`. Failure or misconfiguration of one cluster no longer affects the other environments' data plane.
+- Trade-off vs Enhanced: 3&#x00D7; appliance licensing cost, 3&#x00D7; operational surface for FortiGate management. Trade-off vs full HUB-per-env (below): preserves single-project IAM/billing/state simplicity.
+- Middle ground for customers who need per-environment appliance isolation but do not need per-environment project-level separation.
 
 **High-isolation option** (HUB-per-environment):
 - Deploy independent FortiGate HA cluster per environment (`HUB-PRO`, `HUB-PRE`, `HUB-DEV`).

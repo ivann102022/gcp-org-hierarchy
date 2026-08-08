@@ -60,11 +60,21 @@ This is where the subtle GCP model matters, and where a common mis-formulation m
 
 The correct formulation is therefore: **"subnets have routing reachability but no default authorization."** Do not say "subnets are isolated by default" &mdash; that conflates routing with policy, and misses that the isolation is enforced by the distributed firewall, not by the topology.
 
+## The scales are connected, not siloed
+
+The three scales are distinct concerns with distinct primary tools, but they are **not independent silos**. Scale 1 provides the scope over which Scale 3 rules can inherit.
+
+The connective tissue is **Hierarchical Firewall Policies (HFPs)**. An HFP is a Scale 3 mechanism (distributed firewall rule) that attaches at Scale 1 scope (Organization or Folder) and propagates by inheritance down the hierarchy to VPCs of descendant Projects. Rules with `goto_next` action delegate evaluation further down; rules with terminal action are non-overridable by descendants.
+
+Concretely: an HFP attached at the `LandingZones/HostPrj` folder governs firewall behaviour for every VM interface using any Host Project's VPC underneath &mdash; PRO, PRE, DEV. That inheritance is what makes the "hierarchy first" principle operationally meaningful for network policy, not only for IAM and org policies.
+
+Consequence: **getting Scale 1 right today is a precondition for expressing effective Scale 3 policy tomorrow**. The folder shape decisions in ADR-0005 and ADR-0006 are causal for what `30-org-policies` (planned) and future HFP-based policies can express cleanly via inheritance.
+
 ## The portfolio principle
 
 Made explicit as a one-sentence rule referenced across every other ADR:
 
-> **The architecture does not delegate segmentation exclusively to the network. The first frontier is established via Resource Manager (Folders + Projects). The second is via VPC / Shared VPC connectivity domains. Fine-grained authorization is enforced by distributed firewall controls. The centralized perimeter is reserved for the flows that require transit and inspection between domains.**
+> **The architecture does not delegate segmentation exclusively to the network. The first frontier is established via Resource Manager (Folders + Projects). The second is via VPC / Shared VPC connectivity domains. Fine-grained authorization is enforced by distributed firewall controls &mdash; often via Hierarchical Firewall Policies that inherit down the Scale-1 hierarchy. The centralized perimeter is reserved for the flows that require transit and inspection between domains.**
 
 This principle is why the portfolio's Tier 0 shape looks the way it does, and why a single shared perimeter HUB (see [ADR-0010](0010-single-shared-perimeter-hub.md)) is a defensible design rather than a corner-cutting compromise.
 

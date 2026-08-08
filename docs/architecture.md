@@ -46,6 +46,18 @@ Full principle in [ADR-0009](adr/0009-layered-segmentation-hierarchy-first.md). 
 
 Framework alignment for every decision is consolidated in [`security/control-mapping.md`](security/control-mapping.md); per-decision maturity paths (current / enhanced / high-isolation) in [`security/maturity.md`](security/maturity.md).
 
+## Cloud Billing Account is outside the Resource Manager tree
+
+Worth flagging explicitly because `billing_account_id` appears prominently in this repo's contract and a reader might infer it is part of the hierarchy.
+
+The Cloud Billing Account is **not** part of the Resource Manager tree (`Organization → Folder → Project`). It is a separate resource (`billingAccounts/<id>`) with a **billing relationship** to Projects, expressed via `google_project.billing_account`. A single Billing Account may pay for Projects across multiple Organizations, which makes it structurally orthogonal to the hierarchy &mdash; the Resource Manager tree is per-Organization; the Billing Account can span across.
+
+Throughout this repo:
+
+- **`billing_account_id` is a contract attribute**, not a hierarchy node. Stack `00-org-baseline` publishes it as one of the "anchor" facts so downstream stacks (starting with `20-projects`) can link the Platform Projects to the correct Billing Account via `google_project.billing_account`.
+- **`roles/billing.user` on the Billing Account** is a distinct IAM scope from `roles/resourcemanager.*` on Org / Folder / Project scopes. Stack `20-projects` requires both because it creates Projects (Resource Manager scope) AND attaches them to the Billing Account (Billing scope).
+- **The folder tree diagrams throughout this repo** do not depict the Billing Account. It sits alongside the hierarchy, not inside it.
+
 ## Stack `00-org-baseline`: the anchor + baseline pattern
 
 The name of stack `00-org-baseline` is deliberate and encodes two active responsibilities, not one passive lookup:
